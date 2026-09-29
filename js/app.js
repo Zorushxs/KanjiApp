@@ -17,9 +17,12 @@ const App = (() => {
     const [name, ...rest] = location.hash.replace(/^#\/?/, '').split('/');
     let arg = rest.join('/'); try { arg = decodeURIComponent(arg); } catch {}
     current = ROUTES[name] || Inici;
+    // Si es repinta la mateixa pantalla (p. ex. en canviar d'idioma), els desplegables oberts es queden oberts.
+    const reopen = location.hash === lastHash ? [...$('#view').querySelectorAll('details[data-fold][open]')].map(d => d.dataset.fold) : [];
     const root = document.createElement('div'); root.className = 'screen';
     $('#view').replaceChildren(root);
     current.render(root, arg);
+    reopen.forEach(f => { const d = root.querySelector(`details[data-fold="${f}"]`); if (d) d.open = true; });
     document.querySelectorAll('[data-nav]').forEach(a => {
       const on = a.dataset.nav === current.nav;
       a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');

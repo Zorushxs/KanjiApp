@@ -21,7 +21,7 @@ const Fitxa = (() => {
         <span class="rd-v" lang="ja">${arr.length ? arr.map(fmt).join('<span class="sep">、</span>') : esc(t('card.none'))}</span>
         ${U.say(arr.map(U.plain).join('、'))}</div>`;
     const sec = (cls, title, body, extra = '') => body ? `<section class="panel ${cls}"><h2>${esc(title)}${extra}</h2>${body}</section>` : '';
-    const fold = (title, text) => text ? `<details class="panel fold"><summary>${esc(title)}</summary><p>${esc(text)}</p></details>` : '';
+    const fold = (id, title, text) => text ? `<details class="panel fold" data-fold="${id}"><summary>${esc(title)}</summary><p>${esc(text)}</p></details>` : '';
     const examples = k.examples.map(e => `<li>
         <span class="ex-w" lang="ja">${U.mark(e.word, ch)}</span><span class="ex-r" lang="ja">${esc(e.reading)}</span>
         <span class="ex-m">${esc(tr(e.meaning))}</span>${U.say(e.reading)}</li>`).join('');
@@ -66,8 +66,8 @@ const Fitxa = (() => {
           ${sec('mnemo', t('card.mnemonic'), tr(k.mnemonic) ? `<p>${esc(tr(k.mnemonic))}</p>` : '')}
           ${sec('', t('card.examples'), examples ? `<ul class="ex">${examples}</ul>` : '')}
           ${sec('', t('card.sentence'), sentence, U.say(s.reading || s.jp))}
-          ${fold(t('card.origin'), tr(k.origin))}
-          ${fold(t('card.trivia'), tr(k.trivia))}
+          ${fold('origin', t('card.origin'), tr(k.origin))}
+          ${fold('trivia', t('card.trivia'), tr(k.trivia))}
           <section class="panel check">
             <h2>${esc(t('card.check'))}</h2>
             <button type="button" class="btn ver" data-act="verify"></button>

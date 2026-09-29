@@ -22,7 +22,7 @@ const Afegir = (() => {
           <button type="button" class="btn primary" data-act="copy">${esc(t('add.copy'))}</button>
           <a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">${esc(t('add.openClaude'))} ↗</a>
         </div>
-        <details class="pview"><summary>${esc(t('add.showPrompt'))}</summary><textarea class="ptext" rows="12" readonly aria-label="Prompt"></textarea></details>
+        <details class="pview" data-fold="prompt"><summary>${esc(t('add.showPrompt'))}</summary><textarea class="ptext" rows="12" readonly aria-label="Prompt"></textarea></details>
       </section>
       <section class="panel step">
         <h2><span class="n">2</span>${esc(t('add.step2'))}</h2>
