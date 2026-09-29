@@ -1,0 +1,132 @@
+// Llegeix la resposta de la IA, en valida els camps i li dona la forma exacta d'un kanji.
+// Aquí es neteja tot el text i, a més, les pantalles l'escapen en pintar-lo: no ens refiem mai del contingut.
+const Validar = (() => {
+  const HAN = /^\p{Script=Han}$/u;
+  const JP = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+  const ON = /^[\p{Script=Katakana}ー・.\-]+$/u;
+  const KUN = /^[\p{Script=Hiragana}ー.\-]+$/u;
+  const KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー・、。，．！？!?,.\s「」『』〜～…\-]+$/u;
+  const EMOJI = /^[^\p{L}\p{N}\s<>&"'`]{1,16}$/u;
+  const CTRL = /[\u0000-\u001f\u007f​‌‎‏‪-‮⁦-⁩﻿]/g;
+  const TXT = 400; // longitud màxima dels textos explicatius
+
+  // Avisos sense repetir: { k: clau de i18n, p: valors }.
+  const notes = () => {
+    const list = [];
+    return { list, add(k, p) { const id = k + JSON.stringify(p || {}); if (!list.some(x => x.id === id)) list.push({ id, k, p }); } };
+  };
+  function str(v, max, n) {
+    if (typeof v === 'number') v = String(v);
+    if (typeof v !== 'string') return '';
+    let s = v.replace(CTRL, ' ').replace(/\s+/g, ' ').trim();
+    if (s.length > max) { s = s.slice(0, max).trimEnd() + '…'; if (n) n.add('val.long'); }
+    return s;
+  }
+  const pair = (v, max, n) => typeof v === 'string'
+    ? { ca: str(v, max, n), en: str(v, max, n) }
+    : { ca: str(v && v.ca, max, n), en: str(v && v.en, max, n) };
+  const items = v => Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,、;]/) : [];
+  const words = (v, max, n) => [...new Set(items(v).map(x => str(x, max, n)).filter(Boolean))].slice(0, 8);
+  const int = (v, lo, hi) => {
+    const x = typeof v === 'string' ? Number(v.trim().replace(/^N/i, '')) : v;
+    return Number.isInteger(x) && x >= lo && x <= hi ? x : null;
+  };
+
+  // Dona la forma exacta a qualsevol objecte, sense jutjar-ne el contingut. També serveix per carregar l'arxiu.
+  function coerce(o, n) {
+    o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+    const m = o.meanings, s = o.sentence && typeof o.sentence === 'object' ? o.sentence : {};
+    return {
+      kanji: str(o.kanji, 8),
+      meanings: Array.isArray(m) || typeof m === 'string'
+        ? { ca: [], en: words(m, 60, n) }
+        : { ca: words(m && m.ca, 60, n), en: words(m && m.en, 60, n) },
+      onyomi: words(o.onyomi, 20, n).map(r => r.replace(/\s/g, '')),
+      kunyomi: words(o.kunyomi, 20, n).map(r => r.replace(/\s/g, '')),
+      strokes: int(o.strokes, 1, 64),
+      jlpt: int(o.jlpt, 1, 5),
+      emoji: str(o.emoji, 64),
+      origin: pair(o.origin, TXT, n),
+      mnemonic: pair(o.mnemonic, TXT, n),
+      examples: (Array.isArray(o.examples) ? o.examples : []).filter(e => e && typeof e === 'object').slice(0, 6)
+        .map(e => ({ word: str(e.word, 30, n), reading: str(e.reading, 60, n), meaning: pair(e.meaning, 120, n) }))
+        .filter(e => e.word),
+      sentence: { jp: str(s.jp, 150, n), reading: str(s.reading, 250, n), meaning: pair(s.meaning, 250, n) },
+      trivia: pair(o.trivia, TXT, n),
+      verified: o.verified === true,
+    };
+  }
+
+  // Revisió estricta d'un element que ve de la IA: errors (no es desa) i avisos (es desa igualment).
+  function check(raw) {
+    const n = notes(), errors = [];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { item: null, kanji: '', errors: [{ k: 'val.notObject' }], warnings: [] };
+    const k = coerce(raw, n);
+    k.verified = false; // només el marques tu, des de la fitxa
+    if (!HAN.test(k.kanji)) errors.push({ k: 'val.kanji', p: { v: k.kanji || '—' } });
+    if (!k.meanings.ca.length && !k.meanings.en.length) errors.push({ k: 'val.meanings' });
+    if (!k.onyomi.length && !k.kunyomi.length) errors.push({ k: 'val.readings' });
+    k.onyomi.forEach(v => { if (!ON.test(v)) errors.push({ k: 'val.on', p: { v } }); });
+    k.kunyomi.forEach(v => { if (!KUN.test(v)) errors.push({ k: 'val.kun', p: { v } }); });
+    if (k.strokes === null) {
+      if (raw.strokes == null || raw.strokes === '') n.add('val.noStrokes'); else errors.push({ k: 'val.strokes' });
+    }
+    if (k.jlpt === null && raw.jlpt != null && raw.jlpt !== '' && raw.jlpt !== 0) n.add('val.jlpt');
+    if (k.emoji && !EMOJI.test(k.emoji)) { k.emoji = ''; n.add('val.emoji'); }
+
+    const given = Array.isArray(raw.examples) ? Math.min(raw.examples.length, 5) : 0;
+    k.examples = k.examples.filter(e => JP.test(e.word) && KANA.test(e.reading)).slice(0, 5);
+    if (k.examples.length < given) n.add('val.example');
+    k.examples.forEach(e => { if (HAN.test(k.kanji) && !e.word.includes(k.kanji)) n.add('val.exampleNoKanji', { v: e.word }); });
+    if (k.sentence.reading && !KANA.test(k.sentence.reading)) n.add('val.sentenceReading');
+
+    const texts = [k.mnemonic, k.origin, k.trivia, k.sentence.meaning, ...k.examples.map(e => e.meaning)];
+    [['ca', 'en', 'val.missingCa'], ['en', 'ca', 'val.missingEn']].forEach(([l, o, key]) => {
+      if ((!k.meanings[l].length && k.meanings[o].length) || texts.some(p => p[o] && !p[l])) n.add(key);
+    });
+    return { item: errors.length ? null : k, kanji: k.kanji, errors, warnings: n.list };
+  }
+
+  // Treu el JSON de la resposta: un o més blocs ```json, o el tros entre el primer [ { i l'últim ] }.
+  // Si el bloc no es tanca (resposta tallada), s'intenta igualment perquè l'error ho expliqui.
+  function extract(text) {
+    const s = String(text || '');
+    const blocks = [...s.matchAll(/```[a-zA-Z]*[ \t]*\r?\n?([\s\S]*?)```/g)].map(m => m[1].trim()).filter(Boolean);
+    const open = /```[a-zA-Z]*[ \t]*\r?\n([\s\S]*)$/.exec(s);
+    const out = [];
+    for (const b of blocks.length ? blocks : [cut(open ? open[1] : s)]) {
+      let d;
+      try { d = JSON.parse(b); }
+      catch (e) {
+        try { d = JSON.parse(b.replace(/,\s*([\]}])/g, '$1')); } // comes finals, un error típic
+        catch { throw new Error(t('add.badJson', { msg: e.message })); }
+      }
+      if (d && !Array.isArray(d) && Array.isArray(d.kanji)) d = d.kanji;
+      else if (d && typeof d === 'object' && !Array.isArray(d)) d = [d];
+      if (!Array.isArray(d)) throw new Error(t('add.notList'));
+      out.push(...d);
+    }
+    return out;
+  }
+  function cut(s) {
+    const a = s.search(/[[{]/), b = Math.max(s.lastIndexOf(']'), s.lastIndexOf('}'));
+    if (a < 0) throw new Error(t('add.noJson'));
+    return b > a ? s.slice(a, b + 1) : s.slice(a);
+  }
+
+  // Previsualització: cada element amb el seu estat (new | upd | same | err). get(ch) torna el kanji actual.
+  const same = (a, b) => JSON.stringify({ ...a, verified: false }) === JSON.stringify(b);
+  function review(text, get) {
+    const rows = extract(text).map(check), last = new Map();
+    rows.forEach((r, i) => { if (r.item) last.set(r.item.kanji, i); });
+    rows.forEach((r, i) => {
+      if (!r.item) { r.status = 'err'; return; }
+      if (last.get(r.item.kanji) !== i) { r.status = 'err'; r.item = null; r.errors.push({ k: 'val.dup' }); return; }
+      const old = get(r.item.kanji);
+      r.status = !old ? 'new' : same(old, r.item) ? 'same' : 'upd';
+      if (r.status === 'upd' && old.verified) r.warnings.push({ k: 'add.loseVerified' });
+    });
+    return rows;
+  }
+  return { coerce, check, extract, review };
+})();
