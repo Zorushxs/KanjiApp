@@ -8,6 +8,8 @@ const Validar = (() => {
   const KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー・、。，．！？!?,.\s「」『』〜～…\-]+$/u;
   const EMOJI = /^[^\p{L}\p{N}\s<>&"'`]{1,16}$/u;
   const CTRL = /[\u0000-\u001f\u007f\u200b\u200c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
+  const READ = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u; // lectura principal: només kana
+  const ROMA = /^[A-Za-zĀāĪīŪūĒēŌō'’\s.,!?;:"()-]+$/; // rōmaji de la frase
   const TXT = 400, LONG = 650; // longitud màxima dels textos explicatius (origen i curiositat, més llargs)
   const LANGS = ['ca', 'es', 'en']; // idiomes del contingut (els que demana el prompt)
   const VERIFIED = [false, true, 'error']; // per verificar · verificat · té errors
@@ -45,6 +47,7 @@ const Validar = (() => {
         : byLang(l => words(m && m[l], 60, n)),
       onyomi: words(o.onyomi, 20, n).map(r => r.replace(/\s/g, '')),
       kunyomi: words(o.kunyomi, 20, n).map(r => r.replace(/\s/g, '')),
+      reading: str(o.reading, 20, n).replace(/\s/g, ''), // la lectura que s'aprèn primer (一 → いち)
       strokes: int(o.strokes, 1, 64),
       jlpt: int(o.jlpt, 1, 5),
       emoji: str(o.emoji, 64),
@@ -53,7 +56,7 @@ const Validar = (() => {
       examples: (Array.isArray(o.examples) ? o.examples : []).filter(e => e && typeof e === 'object').slice(0, 6)
         .map(e => ({ word: str(e.word, 30, n), reading: str(e.reading, 60, n), meaning: pair(e.meaning, 120, n) }))
         .filter(e => e.word),
-      sentence: { jp: str(s.jp, 150, n), reading: str(s.reading, 250, n), meaning: pair(s.meaning, 250, n) },
+      sentence: { jp: str(s.jp, 150, n), reading: str(s.reading, 250, n), romaji: str(s.romaji, 300, n), meaning: pair(s.meaning, 250, n) },
       trivia: pair(o.trivia, LONG, n),
       verified: VERIFIED.includes(o.verified) ? o.verified : false,
     };
@@ -81,6 +84,16 @@ const Validar = (() => {
     if (k.examples.length < given) n.add('val.example');
     k.examples.forEach(e => { if (HAN.test(k.kanji) && !e.word.includes(k.kanji)) n.add('val.exampleNoKanji', { v: e.word }); });
     if (k.sentence.reading && !KANA.test(k.sentence.reading)) n.add('val.sentenceReading');
+    if (k.sentence.romaji && !ROMA.test(k.sentence.romaji)) { k.sentence.romaji = ''; n.add('val.romaji'); }
+
+    // Lectura principal: en kana (es desa en hiragana) i, si pot ser, una de les lectures de la llista.
+    if (!k.reading) n.add('val.noReading');
+    else if (!READ.test(k.reading)) { n.add('val.reading', { v: k.reading }); k.reading = ''; }
+    else {
+      k.reading = U.hira(k.reading);
+      const all = [...k.onyomi, ...k.kunyomi].flatMap(r => [U.plain(r), r.split('.')[0].replace(/-/g, '')]).map(U.hira);
+      if (!all.includes(k.reading)) n.add('val.readingNotListed', { v: k.reading });
+    }
 
     const texts = [k.mnemonic, k.origin, k.trivia, k.sentence.meaning, ...k.examples.map(e => e.meaning)];
     const some = p => LANGS.some(l => p[l] && p[l].length);
@@ -111,6 +124,12 @@ const Validar = (() => {
     }
     return out;
   }
+  // Text que Claude escriu fora dels blocs ```json (per exemple, l'avís de paraules que s'escriuen en kana).
+  // Només si la resposta porta blocs; si no, tot és JSON. Es neteja i es retalla com qualsevol altre text.
+  function note(text) {
+    const s = String(text || '');
+    return /```/.test(s) ? str(s.replace(/```[a-zA-Z]*[ \t]*\r?\n?[\s\S]*?(```|$)/g, ' '), 400) : '';
+  }
   function cut(s) {
     const a = s.search(/[[{]/), b = Math.max(s.lastIndexOf(']'), s.lastIndexOf('}'));
     if (a < 0) throw new Error(t('add.noJson'));
@@ -131,5 +150,5 @@ const Validar = (() => {
     });
     return rows;
   }
-  return { coerce, check, extract, review, VERIFIED };
+  return { coerce, check, extract, review, note, VERIFIED };
 })();

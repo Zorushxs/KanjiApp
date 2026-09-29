@@ -95,20 +95,26 @@ const Practica = (() => {
   }
 
   // ---------- Sessió ----------
+  // Totes les lectures (la principal, destacada) amb el rōmaji al costat.
   function reads(k) {
-    const line = (label, arr, fmt) => arr.length ? `<span><small>${esc(label)}</small> ${arr.map(fmt).join('、')}</span>` : '';
-    return `<div class="reads" lang="ja">${line(t('card.on'), k.onyomi, esc)}${line(t('card.kun'), k.kunyomi, U.kun)}</div>` +
+    const one = (r, fmt) => (U.isMain(k, r) ? `<b class="is-main">${fmt(r)}</b>` : fmt(r));
+    const line = (label, arr, fmt) => arr.length
+      ? `<span class="rl"><small>${esc(label)}</small><span lang="ja">${arr.map(r => one(r, fmt)).join('、')}</span><span class="ros">${arr.map(U.ro).join(', ')}</span></span>` : '';
+    return `<div class="reads">${line(t('card.on'), k.onyomi, esc)}${line(t('card.kun'), k.kunyomi, U.kun)}</div>` +
       U.say([...k.onyomi, ...k.kunyomi].map(U.plain).join('、'), t('card.listenReadings'));
   }
+  // La lectura que s'aprèn primer (camp "reading"), amb el rōmaji i la veu. Les fitxes antigues no en tenen.
+  const mainLine = (k, big) => (k.reading
+    ? `<div class="ans-main${big ? ' big' : ''}"><span lang="ja">${esc(k.reading)}</span>${U.ro(k.reading)}${U.say(k.reading, t('card.listenMain'))}</div>` : '');
   function back(k) {
     const means = esc(I18n.list(k.meanings).join(' · ')), emoji = k.emoji ? ` <span aria-hidden="true">${esc(k.emoji)}</span>` : '';
     const mn = I18n.tr(k.mnemonic), ex = k.examples[0];
     let main;
-    if (s.mode === 'k2m') main = `<div class="ans-m">${means}${emoji}</div><div class="ans-r">${reads(k)}</div>`;
-    else if (s.mode === 'm2k') main = `<div class="big-k" lang="ja">${esc(k.kanji)}</div><div class="ans-r">${reads(k)}</div>`;
+    if (s.mode === 'k2m') main = `<div class="ans-m">${means}${emoji}</div>${mainLine(k)}<div class="ans-r">${reads(k)}</div>`;
+    else if (s.mode === 'm2k') main = `<div class="big-k" lang="ja">${esc(k.kanji)}</div>${mainLine(k)}<div class="ans-r">${reads(k)}</div>`;
     else {
-      main = `<div class="ans-r big">${reads(k)}</div><div class="ans-m small">${means}${emoji}</div>` +
-        (ex ? `<p class="ans-ex"><span lang="ja">${U.mark(ex.word, k.kanji)}</span> <span lang="ja">${esc(ex.reading)}</span> · ${esc(I18n.tr(ex.meaning))}</p>` : '');
+      main = `${mainLine(k, true)}<div class="ans-r${k.reading ? '' : ' big'}">${reads(k)}</div><div class="ans-m small">${means}${emoji}</div>` +
+        (ex ? `<p class="ans-ex"><span lang="ja">${U.mark(ex.word, k.kanji)}</span> <span lang="ja">${esc(ex.reading)}</span> ${U.ro(ex.reading)} · ${esc(I18n.tr(ex.meaning))}</p>` : '');
     }
     return main + (mn ? `<p class="ans-mn">${esc(mn)}</p>` : '') + `<a class="lnk" href="${U.kanjiHref(k.kanji)}">${esc(t('pr.seeCard'))}</a>`;
   }

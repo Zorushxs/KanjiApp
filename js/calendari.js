@@ -45,9 +45,8 @@ const Calendari = (() => {
         </div>
         <div class="cal-week" aria-hidden="true">${week.map(w => `<span>${esc(w)}</span>`).join('')}</div>
         <ol class="cal-grid">${'<li class="blank" aria-hidden="true"></li>'.repeat(lead)}${days.map(cell).join('')}</ol>
-        <div class="cal-legend" aria-hidden="true"><span>${esc(t('cal.less'))}</span>
-          <i title="0"></i>${LEVELS.map((x, i) => `<i class="l${i + 1}" title="${range(x, LEVELS[i + 1] && LEVELS[i + 1] - 1)}"></i>`).join('')}
-          <span>${esc(t('cal.more'))}</span></div>
+        <div class="cal-legend"><span class="cap">${esc(t('cal.legend'))}</span>
+          <ul>${['0', ...LEVELS.map((x, i) => range(x, LEVELS[i + 1] && LEVELS[i + 1] - 1))].map((r, i) => `<li><i${i ? ` class="l${i}"` : ''}></i>${r}</li>`).join('')}</ul></div>
         <p class="hint">${esc(Object.keys(h).length ? t('cal.hint') : t('cal.empty'))}</p>
       </section>`;
     root.onclick = e => {

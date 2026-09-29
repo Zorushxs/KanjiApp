@@ -6,8 +6,11 @@ const Inici = (() => {
   const lv = k => (k.jlpt ? 'n' + k.jlpt : 'none');
   const lvName = l => (l === 'none' ? t('home.noLevel') : l.toUpperCase());
   const norm = s => U.hira(String(s).toLowerCase());
-  const hay = k => norm([k.kanji, ...k.meanings.ca, ...k.meanings.en, ...k.onyomi, ...k.kunyomi.map(U.plain),
-    ...k.examples.map(e => e.word + ' ' + e.reading)].join(' '));
+  // Text on es busca: significats en tots els idiomes, lectures en kana i en rōmaji, i exemples.
+  const hay = k => {
+    const reads = [k.reading, ...k.onyomi, ...k.kunyomi.map(U.plain), ...k.examples.map(e => e.reading)].filter(Boolean);
+    return norm([k.kanji, ...Object.values(k.meanings).flat(), ...reads, ...reads.map(U.romaji), ...k.examples.map(e => e.word)].join(' '));
+  };
 
   // La llista tal com es veu (cerca + nivell). La fitxa la fa servir per anar a l'anterior i al següent.
   function visible() {

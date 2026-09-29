@@ -16,17 +16,21 @@ const Fitxa = (() => {
     const nav = (x, label, dir) => x
       ? `<a class="icon-btn" href="${U.kanjiHref(x.kanji)}" data-replace aria-label="${esc(label)}" title="${esc(label)}">${U.ICON[dir]}</a>`
       : `<span class="icon-btn off" aria-hidden="true">${U.ICON[dir]}</span>`;
+    // Cada lectura amb el seu rōmaji a sota; la principal, destacada.
+    const one = (r, fmt) => U.isMain(k, r) ? `<b class="is-main" title="${esc(t('card.mainHint'))}">${fmt(r)}</b>` : fmt(r);
     const rd = (label, hint, arr, fmt) => `<div class="rd">
         <span class="rd-l">${esc(label)} <small>${esc(hint)}</small></span>
-        <span class="rd-v" lang="ja">${arr.length ? arr.map(fmt).join('<span class="sep">、</span>') : esc(t('card.none'))}</span>
+        <span class="rd-v" lang="ja">${arr.length ? arr.map(r => one(r, fmt)).join('<span class="sep">、</span>') : esc(t('card.none'))}</span>
+        ${arr.length ? `<span class="rd-ro">${arr.map(U.ro).join('<span class="sep">, </span>')}</span>` : ''}
         ${U.say(arr.map(U.plain).join('、'))}</div>`;
     const sec = (cls, title, body, extra = '') => body ? `<section class="panel ${cls}"><h2>${esc(title)}${extra}</h2>${body}</section>` : '';
     const fold = (id, title, text) => text ? `<details class="panel fold" data-fold="${id}"><summary>${esc(title)}</summary><p>${esc(text)}</p></details>` : '';
     const examples = k.examples.map(e => `<li>
-        <span class="ex-w" lang="ja">${U.mark(e.word, ch)}</span><span class="ex-r" lang="ja">${esc(e.reading)}</span>
+        <span class="ex-w" lang="ja">${U.mark(e.word, ch)}</span><span class="ex-r"><span lang="ja">${esc(e.reading)}</span> ${U.ro(e.reading)}</span>
         <span class="ex-m">${esc(tr(e.meaning))}</span>${U.say(e.reading)}</li>`).join('');
     const sentence = s.jp ? `<p class="sent-jp" lang="ja">${U.mark(s.jp, ch)}</p>
-        ${s.reading ? `<p class="sent-r" lang="ja">${esc(s.reading)}</p>` : ''}<p class="sent-m">${esc(tr(s.meaning))}</p>` : '';
+        ${s.reading ? `<p class="sent-r" lang="ja">${esc(s.reading)}</p>` : ''}
+        ${s.romaji ? `<p class="sent-ro ro" lang="ja-Latn">${esc(s.romaji)}</p>` : ''}<p class="sent-m">${esc(tr(s.meaning))}</p>` : '';
     const status = p ? t('card.box', { box: p.box, date: U.fmtDate(p.due) }) : t('card.new');
 
     root.innerHTML = `
@@ -38,10 +42,11 @@ const Fitxa = (() => {
       <article class="sheet">
         <div class="col">
           <section class="panel hero">
-            ${U.say([...k.onyomi, ...k.kunyomi].map(U.plain).join('、'), t('card.listenReadings'))}
+            ${k.reading ? U.say(k.reading, t('card.listenMain')) : U.say([...k.onyomi, ...k.kunyomi].map(U.plain).join('、'), t('card.listenReadings'))}
             ${k.emoji ? `<span class="emoji" aria-hidden="true">${esc(k.emoji)}</span>` : ''}
             <div class="hero-k" lang="ja">${esc(ch)}</div>
             <h1 class="means">${esc(I18n.list(k.meanings).join(' · '))}</h1>
+            ${k.reading ? `<p class="main-r"><small>${esc(t('card.main'))}</small> <span lang="ja">${esc(k.reading)}</span> ${U.ro(k.reading)}</p>` : ''}
             <div class="facts">
               ${k.jlpt ? `<span class="pill">N${k.jlpt}</span>` : ''}
               ${k.strokes ? `<span class="pill">${esc(t('card.strokes', { n: k.strokes }))}</span>` : ''}
