@@ -26,6 +26,10 @@ Tot es desa en un JSON: el tries amb **Crear arxiu / Obrir existent** (Chrome i 
 
 El format de cada kanji és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors).
 
+## Veu
+
+Si el navegador té una veu japonesa, la fa servir i funciona sense connexió. Si no en té (per exemple Opera, o Windows sense la veu japonesa), reprodueix la veu en línia de Google Translate. És un servei no oficial: envia el text a Google i podria deixar de funcionar. Per tenir veu sense connexió a Windows: **Configuració → Hora i idioma → Veu → Afegeix veus → Japonès**.
+
 ## Estructura
 
 ```

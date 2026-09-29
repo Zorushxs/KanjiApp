@@ -38,8 +38,7 @@ const App = (() => {
   });
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-say]'); if (!b) return;
-    const r = Veu.say(b.dataset.say);
-    if (r === 'nospeech') U.toast(t('card.noSpeech'), 'warn'); else if (r === 'novoice') U.toast(t('card.noVoice'), 'warn');
+    Veu.say(b.dataset.say).catch(() => U.toast(t('card.noAudio'), 'warn'));
   });
 
   // ---------- Tema i idioma ----------

@@ -47,7 +47,7 @@ const U = (() => {
   let tt = null;
   function toast(msg, kind) {
     const el = $('#toast'); el.textContent = msg; el.dataset.kind = kind || ''; el.hidden = false;
-    clearTimeout(tt); tt = setTimeout(() => { el.hidden = true; }, 3500);
+    clearTimeout(tt); tt = setTimeout(() => { el.hidden = true; }, Math.max(3500, msg.length * 60)); // els llargs, més estona
   }
   return { $, esc, today, addDays, fmtDate, hira, plain, kun, mark, jisho, kanjiHref, shuffle, ICON, ver, say, toast };
 })();

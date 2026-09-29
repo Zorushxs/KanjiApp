@@ -8,7 +8,7 @@ const Validar = (() => {
   const KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー・、。，．！？!?,.\s「」『』〜～…\-]+$/u;
   const EMOJI = /^[^\p{L}\p{N}\s<>&"'`]{1,16}$/u;
   const CTRL = /[\u0000-\u001f\u007f\u200b\u200c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
-  const TXT = 400; // longitud màxima dels textos explicatius
+  const TXT = 400, LONG = 650; // longitud màxima dels textos explicatius (origen i curiositat, més llargs)
   const LANGS = ['ca', 'es', 'en']; // idiomes del contingut (els que demana el prompt)
   const VERIFIED = [false, true, 'error']; // per verificar · verificat · té errors
 
@@ -48,13 +48,13 @@ const Validar = (() => {
       strokes: int(o.strokes, 1, 64),
       jlpt: int(o.jlpt, 1, 5),
       emoji: str(o.emoji, 64),
-      origin: pair(o.origin, TXT, n),
+      origin: pair(o.origin, LONG, n),
       mnemonic: pair(o.mnemonic, TXT, n),
       examples: (Array.isArray(o.examples) ? o.examples : []).filter(e => e && typeof e === 'object').slice(0, 6)
         .map(e => ({ word: str(e.word, 30, n), reading: str(e.reading, 60, n), meaning: pair(e.meaning, 120, n) }))
         .filter(e => e.word),
       sentence: { jp: str(s.jp, 150, n), reading: str(s.reading, 250, n), meaning: pair(s.meaning, 250, n) },
-      trivia: pair(o.trivia, TXT, n),
+      trivia: pair(o.trivia, LONG, n),
       verified: VERIFIED.includes(o.verified) ? o.verified : false,
     };
   }

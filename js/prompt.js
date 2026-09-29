@@ -33,11 +33,13 @@ Rules:
 - 2-3 examples of very common words, JLPT N5-N4 level when possible.
 - One short, simple example sentence; "reading" is the whole sentence in hiragana.
 - "origin": the real origin of the character ONLY if you are sure; otherwise leave
-  all texts empty (""). Never invent etymologies.
+  all texts empty (""). Never invent etymologies. When you write it, give some detail:
+  about 35-45 words (2-3 sentences), e.g. what the original drawing showed and how it changed.
 - "mnemonic": a short image or story to remember it (it may be invented).
-- "trivia": only if it is genuinely interesting or useful; otherwise "".
+- "trivia": only if it is genuinely interesting or useful; otherwise "". When you
+  write it, about 35-45 words (2-3 sentences).
 - "emoji": the one that best represents it, or "" if none fits.
-- Keep texts short: at most 25 words per text.
+- Keep the other texts short: at most 25 words per text.
 - "verified" is always false.
 
 Language style:
