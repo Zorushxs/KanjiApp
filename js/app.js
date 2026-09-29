@@ -1,7 +1,7 @@
 // Arrencada, rutes (#/...), tema, idioma, estat de desat, arxiu i exportar/importar.
 const App = (() => {
   const { $, esc } = U;
-  const ROUTES = { '': Inici, k: Fitxa, afegir: Afegir, practica: Practica };
+  const ROUTES = { '': Inici, k: Fitxa, afegir: Afegir, practica: Practica, calendari: Calendari };
   let current = null, lastHash = null, idx = null, replacing = false, saveState = 'saved';
 
   // ---------- Rutes ----------

@@ -12,6 +12,12 @@ HTML, CSS i JavaScript sense dependències ni compilació. Es publica tal qual a
 
 Si regeneres un kanji que ja tens, se'n substitueix el contingut i se'n conserva el progrés de pràctica.
 
+## Pràctica i calendari
+
+**Practicar** fa servir 5 caixes (Leitner): si l'encertes puja de caixa i torna més tard (1, 3, 7, 14 i 30 dies); si falles, torna a la caixa 1. Amb l'interruptor **Tornar a practicar els d'avui** (per a tot el programa, no per targeta), els kanji que ja has practicat avui poden tornar a sortir: encertar-los no els puja de caixa, però fallar-los els torna a la caixa 1.
+
+**Calendari** mostra mes a mes quantes respostes has donat cada dia: com més intens és el color, més has practicat.
+
 ## Dades
 
 Tot es desa en un JSON: el tries amb **Crear arxiu / Obrir existent** (Chrome i Edge d'escriptori) i sempre se'n guarda una còpia al navegador. **Exportar** i **Importar** serveixen per fer còpies o passar les dades a un altre dispositiu.
@@ -19,10 +25,13 @@ Tot es desa en un JSON: el tries amb **Crear arxiu / Obrir existent** (Chrome i 
 ```json
 {
   "version": 1,
-  "kanji": [ { "kanji": "日", "meanings": { "ca": ["sol"], "en": ["sun"] }, "...": "..." } ],
-  "progress": { "日": { "box": 2, "due": "2026-10-02", "seen": 5, "fails": 1 } }
+  "kanji": [ { "kanji": "日", "meanings": { "ca": ["sol"], "es": ["sol"], "en": ["sun"] }, "...": "..." } ],
+  "progress": { "日": { "box": 2, "due": "2026-10-02", "seen": 5, "fails": 1, "last": "2026-09-29" } },
+  "history": { "2026-09-29": 32 }
 }
 ```
+
+`last` és l'últim dia que l'has practicat, i `history`, quantes respostes has donat cada dia (per al calendari).
 
 El format de cada kanji és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors).
 
@@ -47,6 +56,7 @@ js/inici.js         Pantalla: graella, cerca i filtre JLPT
 js/fitxa.js         Pantalla: fitxa d'un kanji
 js/afegir.js        Pantalla: afegir kanji
 js/practica.js      Pantalla: pràctica
+js/calendari.js     Pantalla: calendari de pràctica
 js/app.js           Rutes, tema, idioma, arxiu, exportar/importar
 ```
 

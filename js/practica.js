@@ -1,10 +1,10 @@
 // Pràctica amb repetició espaiada (sistema Leitner de 5 caixes). Les caixes i els dies són a store.js.
 const Practica = (() => {
   const { esc } = U;
-  const KEY = 'kanji:practica', MODES = ['k2m', 'm2k', 'read'], SIZES = [10, 15, 20], GRADES = ['no', 'doubt', 'yes'];
+  const KEY = 'kanji:practica', MODES = ['k2m', 'm2k', 'read'], SIZES = [10, 15, 20], GRADES = ['no', 'yes', 'doubt']; // ordre a la pantalla i tecles 1-2-3
   const LEVELS = ['n5', 'n4', 'n3', 'n2', 'n1', 'none'];
   let prefs = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
-  prefs = { mode: MODES.includes(prefs.mode) ? prefs.mode : 'k2m', size: SIZES.includes(prefs.size) ? prefs.size : 15, level: typeof prefs.level === 'string' ? prefs.level : 'all' };
+  prefs = { mode: MODES.includes(prefs.mode) ? prefs.mode : 'k2m', size: SIZES.includes(prefs.size) ? prefs.size : 15, level: typeof prefs.level === 'string' ? prefs.level : 'all', again: prefs.again === true };
   const savePrefs = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch {} };
   // Sessió: { free, mode, queue: [{ ch, rep }], i, flipped, res, failed, done }. rep = segona passada d'una fallada.
   let s = null, root = null, screen = 'setup';
@@ -33,14 +33,15 @@ const Practica = (() => {
     if (prefs.level !== 'all' && !levels.includes(prefs.level)) prefs.level = 'all';
     const P = pool(), day = U.today();
     const due = P.filter(k => Store.isDue(k.kanji, day)).length, fresh = P.filter(k => !Store.prog(k.kanji)).length;
-    const n = Math.min(prefs.size, due + fresh);
+    const today = prefs.again ? P.filter(k => Store.doneToday(k.kanji)).length : 0;
+    const n = Math.min(prefs.size, due + fresh + today);
     const boxes = [0, 1, 2, 3, 4, 5].map(b => P.filter(k => boxOf(k.kanji) === b).length);
     const radio = (name, v, label, on) => `<label><input type="radio" name="${name}" value="${v}"${on ? ' checked' : ''}><span>${esc(label)}</span></label>`;
     const field = (name, legend, opts) => `<fieldset><legend>${esc(legend)}</legend><div class="seg">${opts.join('')}</div></fieldset>`;
     root.innerHTML = `
       <h1 class="h">${esc(t('pr.title'))}</h1>
       <section class="panel">
-        <p class="big-line">${esc(t('pr.dueNew', { due, new: fresh }))}</p>
+        <p class="big-line">${esc(t('pr.dueNew', { due, new: fresh }) + (prefs.again ? ' · ' + t('pr.todayCount', { n: today }) : ''))}</p>
         <div class="bx">${boxes.map((c, b) => `<div class="b${b}"><b>${c}</b><span>${esc(b ? t('pr.box', { n: b }) : t('pr.boxNew'))}</span></div>`).join('')}</div>
         <p class="hint">${esc(t('pr.explain'))}</p>
       </section>
@@ -49,6 +50,10 @@ const Practica = (() => {
         ${field('size', t('pr.size'), SIZES.map(z => radio('size', z, String(z), prefs.size === z)))}
         ${levels.length > 1 ? field('level', t('pr.level'), [radio('level', 'all', t('home.all'), prefs.level === 'all'),
           ...levels.map(l => radio('level', l, l === 'none' ? t('home.noLevel') : l.toUpperCase(), prefs.level === l))]) : ''}
+        <div class="toggle">
+          <button type="button" class="switch" role="switch" aria-checked="${prefs.again}" data-act="again" aria-labelledby="againLbl" aria-describedby="againHint"><i></i></button>
+          <div><span id="againLbl" class="toggle-l">${esc(t('pr.againToggle'))}</span><p id="againHint" class="hint">${esc(t('pr.againHint'))}</p></div>
+        </div>
         ${n ? `<button type="button" class="btn primary big" data-act="start">${esc(t('pr.start', { n }))}</button>`
           : `<p class="big-line">${esc(P.length ? t('pr.allDone') : t('pr.nothing'))}</p>
              ${P.length ? `<button type="button" class="btn big" data-act="free">${esc(t('pr.free'))}</button><p class="hint">${esc(t('pr.freeHint'))}</p>` : ''}`}
@@ -62,10 +67,15 @@ const Practica = (() => {
       savePrefs(); setup();
       const f = root.querySelector(`input[name="${i.name}"]:checked`); if (f) f.focus();
     };
-    root.onclick = e => { const b = e.target.closest('[data-act]'); if (b) start(b.dataset.act === 'free'); };
+    root.onclick = e => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      if (b.dataset.act === 'again') { prefs.again = !prefs.again; savePrefs(); setup(); root.querySelector('.switch').focus(); }
+      else start(b.dataset.act === 'free');
+    };
   }
 
-  // Primer els que toquen (els més endarrerits i de caixes baixes), després els nous; i es barregen.
+  // Primer els que toquen (els més endarrerits i de caixes baixes), després els nous i, si l'interruptor
+  // és actiu, els que ja has practicat avui; i es barregen.
   // El repàs lliure agafa els de caixes més baixes i no desa res.
   function start(free) {
     const P = pool(), day = U.today();
@@ -76,7 +86,8 @@ const Practica = (() => {
         const x = Store.prog(a.kanji), y = Store.prog(b.kanji);
         return x.due.localeCompare(y.due) || x.box - y.box;
       });
-      list = due.concat(P.filter(k => !Store.prog(k.kanji))).slice(0, prefs.size);
+      const again = prefs.again ? U.shuffle(P.filter(k => Store.doneToday(k.kanji))) : [];
+      list = due.concat(P.filter(k => !Store.prog(k.kanji)), again).slice(0, prefs.size);
     }
     if (!list.length) return;
     s = { free, mode: prefs.mode, queue: U.shuffle(list.map(k => ({ ch: k.kanji, rep: false }))), i: 0, flipped: false, res: { no: 0, doubt: 0, yes: 0 }, failed: [], done: false };
@@ -108,7 +119,8 @@ const Practica = (() => {
     const front = s.mode === 'm2k'
       ? `<div class="big-m">${esc(I18n.list(k.meanings).join(' · '))}</div>`
       : `<div class="big-k" lang="ja">${esc(k.kanji)}</div>`;
-    const hint = g => (s.free || it.rep ? '' : `<small>${esc(days(Store.nextDays(it.ch, g)))}</small>`);
+    const next = g => { const d = Store.nextDays(it.ch, g); return d === null ? t('pr.keep') : days(d); };
+    const hint = g => (s.free || it.rep ? '' : `<small>${esc(next(g))}</small>`);
     root.innerHTML = `
       <div class="ses-top">
         <button type="button" class="btn ghost" data-act="quit">${U.ICON.close}<span>${esc(t('pr.quit'))}</span></button>
@@ -149,6 +161,7 @@ const Practica = (() => {
   function answer(g) {
     if (!s || !s.flipped) return;
     const it = s.queue[s.i];
+    Store.tally(); // el calendari compta totes les respostes
     if (!it.rep) {
       s.res[g]++;
       if (!s.free) Store.review(it.ch, g);

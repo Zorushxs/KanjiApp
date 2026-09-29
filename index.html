@@ -9,7 +9,7 @@
 <meta name="description" content="Aprèn kanji amb fitxes, ordre de traços i repetició espaiada.">
 <title>Kanji</title>
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="css/styles.css?v=1">
+<link rel="stylesheet" href="css/styles.css?v=2">
 <script>
   // Tema abans de pintar, perquè no parpellegi.
   try { const th = localStorage.getItem('kanji:tema'); if (th) document.documentElement.dataset.theme = th; } catch {}
@@ -26,6 +26,10 @@
     <a href="#/practica" data-nav="practice">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="13" height="13" rx="2"/><path d="M7.5 3.5h11a2 2 0 0 1 2 2v11"/></svg>
       <span data-i18n="nav.practice">Practicar</span><b id="dueBadge" class="badge" hidden></b>
+    </a>
+    <a href="#/calendari" data-nav="calendar">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
+      <span data-i18n="nav.calendar">Calendari</span>
     </a>
     <a href="#/afegir" data-nav="add">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg>
@@ -60,18 +64,19 @@
 <input id="importInput" type="file" accept=".json,application/json" hidden>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="js/i18n.js?v=1"></script>
-<script src="js/util.js?v=1"></script>
-<script src="js/almacen.js?v=1"></script>
-<script src="js/validar.js?v=1"></script>
-<script src="js/store.js?v=1"></script>
-<script src="js/prompt.js?v=1"></script>
-<script src="js/veu.js?v=1"></script>
-<script src="js/traces.js?v=1"></script>
-<script src="js/inici.js?v=1"></script>
-<script src="js/fitxa.js?v=1"></script>
-<script src="js/afegir.js?v=1"></script>
-<script src="js/practica.js?v=1"></script>
-<script src="js/app.js?v=1"></script>
+<script src="js/i18n.js?v=2"></script>
+<script src="js/util.js?v=2"></script>
+<script src="js/almacen.js?v=2"></script>
+<script src="js/validar.js?v=2"></script>
+<script src="js/store.js?v=2"></script>
+<script src="js/prompt.js?v=2"></script>
+<script src="js/veu.js?v=2"></script>
+<script src="js/traces.js?v=2"></script>
+<script src="js/inici.js?v=2"></script>
+<script src="js/fitxa.js?v=2"></script>
+<script src="js/afegir.js?v=2"></script>
+<script src="js/practica.js?v=2"></script>
+<script src="js/calendari.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
 </body>
 </html>
