@@ -16,9 +16,10 @@ const Inici = (() => {
   }
   function tile(k, day) {
     const p = Store.prog(k.kanji), box = p ? p.box : 0, due = !!p && p.due <= day, m = I18n.list(k.meanings)[0] || '';
-    const title = [box ? t('tile.box', { n: box }) : t('tile.new'), due ? t('tile.due') : '', k.verified ? t('card.verified') : ''].filter(Boolean).join(' · ');
+    const v = U.ver(k.verified), checked = v.cls !== 'pending';
+    const title = [box ? t('tile.box', { n: box }) : t('tile.new'), due ? t('tile.due') : '', checked ? t(v.key) : ''].filter(Boolean).join(' · ');
     return `<a class="tile${due ? ' due' : ''}" href="${U.kanjiHref(k.kanji)}" title="${esc(title)}">
-      ${k.verified ? '<span class="tile-ok" aria-hidden="true">✓</span>' : ''}
+      ${checked ? `<span class="tile-ver ver-${v.cls}" aria-hidden="true">${v.icon}</span>` : ''}
       <span class="tile-k" lang="ja">${esc(k.kanji)}</span>
       <span class="tile-m">${esc(m)}</span>
       <span class="boxes" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i${i <= box ? ' class="f"' : ''}></i>`).join('')}</span>

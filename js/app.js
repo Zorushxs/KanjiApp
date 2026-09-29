@@ -47,6 +47,8 @@ const App = (() => {
   if (!document.documentElement.dataset.theme) setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 
+  // Un botó per cada idioma d'i18n.js, amb el nom de l'idioma escrit en el mateix idioma.
+  $('#langs').innerHTML = I18n.langs.map(l => `<button type="button" data-lang="${l}" lang="${l}" title="${esc(I18n.name(l))}" aria-label="${esc(I18n.name(l))}">${l.toUpperCase()}</button>`).join('');
   const renderLangs = () => document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === I18n.lang));
   $('#langs').onclick = e => {
     const b = e.target.closest('[data-lang]'); if (!b || b.dataset.lang === I18n.lang) return;

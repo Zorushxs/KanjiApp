@@ -1,12 +1,12 @@
 # Kanji
 
-Web per aprendre kanji practicant: fitxes amb lectures, veu, ordre de traços i mnemotècnia, i pràctica amb repetició espaiada (Leitner, 5 caixes). Funciona a mòbil i PC, en català i anglès, amb tema clar i fosc.
+Web per aprendre kanji practicant: fitxes amb lectures, veu, ordre de traços i mnemotècnia, i pràctica amb repetició espaiada (Leitner, 5 caixes). Funciona a mòbil i PC, en català, castellà i anglès, amb tema clar i fosc.
 
 HTML, CSS i JavaScript sense dependències ni compilació. Es publica tal qual amb GitHub Pages.
 
 ## Com s'afegeixen kanji
 
-1. A **Afegir**, escriu els kanji i prem **Copiar prompt**.
+1. A **Afegir**, escriu els kanji i prem **Copiar prompt**. Els que ja tens no hi van (surten en gris); toca'n un si el vols regenerar.
 2. Enganxa el prompt a [Claude.ai](https://claude.ai) i copia'n la resposta.
 3. Enganxa-la a l'app: la valida, en mostra una previsualització (nous, actualitzats, errors) i la fusiona per caràcter.
 
@@ -24,14 +24,14 @@ Tot es desa en un JSON: el tries amb **Crear arxiu / Obrir existent** (Chrome i 
 }
 ```
 
-El format de cada kanji és el que defineix el prompt de [js/prompt.js](js/prompt.js).
+El format de cada kanji és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors).
 
 ## Estructura
 
 ```
 index.html          Esquelet de la pàgina
 css/styles.css      Estils (mobile-first, tema clar/fosc amb variables)
-js/i18n.js          Tots els textos de la interfície (ca/en)
+js/i18n.js          Tots els textos de la interfície (ca/es/en)
 js/util.js          Utilitats: escapament, dates, kana, icones, avisos
 js/almacen.js       Persistència (JSON al disc + còpia al navegador)
 js/validar.js       Lectura i validació del JSON que ve de la IA

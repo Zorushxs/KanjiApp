@@ -54,7 +54,8 @@ const Store = (() => {
       if (added + updated) persist();
       return { added, updated };
     },
-    setVerified(ch, v) { const k = data.kanji.find(x => x.kanji === ch); if (k) { k.verified = !!v; persist(); } },
+    // Verificació: false (per verificar) · true (verificat) · 'error' (té errors).
+    setVerified(ch, v) { const k = data.kanji.find(x => x.kanji === ch); if (k) { k.verified = Validar.VERIFIED.includes(v) ? v : false; persist(); } },
     remove(ch) { data.kanji = data.kanji.filter(k => k.kanji !== ch); delete data.progress[ch]; persist(); },
     nextDays: (ch, g) => DAYS[nextBox(data.progress[ch], g)],
     review(ch, g) {

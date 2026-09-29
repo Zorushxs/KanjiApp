@@ -7,8 +7,10 @@ const Validar = (() => {
   const KUN = /^[\p{Script=Hiragana}ー.\-]+$/u;
   const KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー・、。，．！？!?,.\s「」『』〜～…\-]+$/u;
   const EMOJI = /^[^\p{L}\p{N}\s<>&"'`]{1,16}$/u;
-  const CTRL = /[\u0000-\u001f\u007f​‌‎‏‪-‮⁦-⁩﻿]/g;
+  const CTRL = /[\u0000-\u001f\u007f\u200b\u200c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
   const TXT = 400; // longitud màxima dels textos explicatius
+  const LANGS = ['ca', 'es', 'en']; // idiomes del contingut (els que demana el prompt)
+  const VERIFIED = [false, true, 'error']; // per verificar · verificat · té errors
 
   // Avisos sense repetir: { k: clau de i18n, p: valors }.
   const notes = () => {
@@ -22,9 +24,9 @@ const Validar = (() => {
     if (s.length > max) { s = s.slice(0, max).trimEnd() + '…'; if (n) n.add('val.long'); }
     return s;
   }
-  const pair = (v, max, n) => typeof v === 'string'
-    ? { ca: str(v, max, n), en: str(v, max, n) }
-    : { ca: str(v && v.ca, max, n), en: str(v && v.en, max, n) };
+  // Un text per idioma de contingut: { ca, es, en }. Si arriba un text sol, serveix per a tots.
+  const byLang = fn => Object.fromEntries(LANGS.map(l => [l, fn(l)]));
+  const pair = (v, max, n) => byLang(l => str(typeof v === 'string' ? v : v && v[l], max, n));
   const items = v => Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,、;]/) : [];
   const words = (v, max, n) => [...new Set(items(v).map(x => str(x, max, n)).filter(Boolean))].slice(0, 8);
   const int = (v, lo, hi) => {
@@ -39,8 +41,8 @@ const Validar = (() => {
     return {
       kanji: str(o.kanji, 8),
       meanings: Array.isArray(m) || typeof m === 'string'
-        ? { ca: [], en: words(m, 60, n) }
-        : { ca: words(m && m.ca, 60, n), en: words(m && m.en, 60, n) },
+        ? byLang(l => (l === 'en' ? words(m, 60, n) : []))
+        : byLang(l => words(m && m[l], 60, n)),
       onyomi: words(o.onyomi, 20, n).map(r => r.replace(/\s/g, '')),
       kunyomi: words(o.kunyomi, 20, n).map(r => r.replace(/\s/g, '')),
       strokes: int(o.strokes, 1, 64),
@@ -53,7 +55,7 @@ const Validar = (() => {
         .filter(e => e.word),
       sentence: { jp: str(s.jp, 150, n), reading: str(s.reading, 250, n), meaning: pair(s.meaning, 250, n) },
       trivia: pair(o.trivia, TXT, n),
-      verified: o.verified === true,
+      verified: VERIFIED.includes(o.verified) ? o.verified : false,
     };
   }
 
@@ -64,7 +66,7 @@ const Validar = (() => {
     const k = coerce(raw, n);
     k.verified = false; // només el marques tu, des de la fitxa
     if (!HAN.test(k.kanji)) errors.push({ k: 'val.kanji', p: { v: k.kanji || '—' } });
-    if (!k.meanings.ca.length && !k.meanings.en.length) errors.push({ k: 'val.meanings' });
+    if (LANGS.every(l => !k.meanings[l].length)) errors.push({ k: 'val.meanings' });
     if (!k.onyomi.length && !k.kunyomi.length) errors.push({ k: 'val.readings' });
     k.onyomi.forEach(v => { if (!ON.test(v)) errors.push({ k: 'val.on', p: { v } }); });
     k.kunyomi.forEach(v => { if (!KUN.test(v)) errors.push({ k: 'val.kun', p: { v } }); });
@@ -81,8 +83,9 @@ const Validar = (() => {
     if (k.sentence.reading && !KANA.test(k.sentence.reading)) n.add('val.sentenceReading');
 
     const texts = [k.mnemonic, k.origin, k.trivia, k.sentence.meaning, ...k.examples.map(e => e.meaning)];
-    [['ca', 'en', 'val.missingCa'], ['en', 'ca', 'val.missingEn']].forEach(([l, o, key]) => {
-      if ((!k.meanings[l].length && k.meanings[o].length) || texts.some(p => p[o] && !p[l])) n.add(key);
+    const some = p => LANGS.some(l => p[l] && p[l].length);
+    LANGS.forEach(l => {
+      if ((!k.meanings[l].length && some(k.meanings)) || texts.some(p => !p[l] && some(p))) n.add('val.missing.' + l);
     });
     return { item: errors.length ? null : k, kanji: k.kanji, errors, warnings: n.list };
   }
@@ -124,9 +127,9 @@ const Validar = (() => {
       if (last.get(r.item.kanji) !== i) { r.status = 'err'; r.item = null; r.errors.push({ k: 'val.dup' }); return; }
       const old = get(r.item.kanji);
       r.status = !old ? 'new' : same(old, r.item) ? 'same' : 'upd';
-      if (r.status === 'upd' && old.verified) r.warnings.push({ k: 'add.loseVerified' });
+      if (r.status === 'upd' && old.verified === true) r.warnings.push({ k: 'add.loseVerified' });
     });
     return rows;
   }
-  return { coerce, check, extract, review };
+  return { coerce, check, extract, review, VERIFIED };
 })();

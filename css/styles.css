@@ -3,6 +3,7 @@
   --bg: #f6f3ee; --panel: #fffdf9; --ink: #1f1c19; --mute: #71695f; --line: #e5ded3; --hover: #f0ebe3;
   --accent: #b3402a; --accent-ink: #ffffff; --accent-soft: #f8e7df;
   --ok: #2e7d4f; --warn: #9a620f; --danger: #b3352f; --ghost: #e6dfd3;
+  --ok-soft: #e2f0e7; --danger-soft: #f8e0dd;
   --b1: #c9573f; --b2: #cf8a2e; --b3: #b9a232; --b4: #6f9e4a; --b5: #2e7d4f;
   --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -16,6 +17,7 @@
   --bg: #141312; --panel: #1d1b19; --ink: #ece6dc; --mute: #a0978b; --line: #312d29; --hover: #27241f;
   --accent: #f08a6c; --accent-ink: #1a1512; --accent-soft: #3b2721;
   --ok: #62c48f; --warn: #e3b252; --danger: #ff8a7a; --ghost: #36312c;
+  --ok-soft: #1c3126; --danger-soft: #3b2220;
   --b1: #f08a6c; --b2: #eaa54c; --b3: #d9c450; --b4: #98c76e; --b5: #62c48f;
   color-scheme: dark;
 }
@@ -129,7 +131,8 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .tile:hover { border-color: var(--accent); transform: translateY(-1px); }
 .tile-k { font: 400 46px/1.15 var(--jp-k); }
 .tile-m { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--mute); }
-.tile-ok { position: absolute; top: 6px; left: 9px; font-size: 12px; font-weight: 700; color: var(--ok); }
+.tile-ver { position: absolute; top: 6px; left: 9px; font-size: 12px; font-weight: 700; }
+.tile-ver.ver-ok { color: var(--ok); } .tile-ver.ver-err { color: var(--danger); }
 .tile.due::after { content: ""; position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .boxes { display: flex; gap: 3px; margin-top: 5px; }
 .boxes i { width: 10px; height: 4px; border-radius: 2px; background: var(--line); }
@@ -152,7 +155,8 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .means { font: 700 24px/1.25 var(--serif); margin: 8px 0 12px; overflow-wrap: anywhere; }
 .facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .pill { padding: 3px 10px; border-radius: 999px; background: var(--hover); color: var(--mute); font-size: 13px; }
-.pill.ok { background: var(--accent-soft); color: var(--ok); font-weight: 600; }
+.pill.ver-ok { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+.pill.ver-err { background: var(--danger-soft); color: var(--danger); font-weight: 600; }
 .stats { margin: 10px 0 0; color: var(--mute); font-size: 13px; }
 .rd { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 .rd:first-of-type { border-top: 0; padding-top: 0; }
@@ -191,8 +195,11 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .fold summary::after { content: "▾"; color: var(--mute); transition: transform .15s; }
 .fold[open] summary::after { transform: rotate(180deg); }
 .fold p { margin: 0; padding: 0 16px 16px; }
-.tick { display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; }
-.tick input { width: 20px; height: 20px; accent-color: var(--ok); }
+/* Botó de verificació: un color i un text per estat. */
+.btn.ver { min-width: 190px; }
+.btn.ver-pending { border-style: dashed; color: var(--mute); }
+.btn.ver-ok { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.btn.ver-err { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 
 /* ---------- Afegir ---------- */
 .step { margin-bottom: 12px; }
@@ -202,8 +209,11 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .picked { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .picked:empty { display: none; }
 .picked p { flex-basis: 100%; margin: 2px 0 0; }
-.kchip { padding: 5px 9px; border-radius: 9px; background: var(--hover); font-size: 21px; line-height: 1.2; }
-.kchip.has { outline: 1.5px dashed var(--mute); outline-offset: -1.5px; }
+.kchip { padding: 5px 9px; border: 1.5px solid transparent; border-radius: 9px; background: var(--hover); color: var(--ink); font-size: 21px; line-height: 1.2; }
+button.kchip { font-family: var(--jp); }
+.kchip.has { background: none; border: 1.5px dashed var(--line); color: var(--mute); opacity: .8; }
+.kchip.has:hover { opacity: 1; }
+.kchip.regen { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .pview { margin-top: 12px; }
 .pview summary { cursor: pointer; color: var(--mute); font-size: 14px; }
 .ptext { margin-top: 8px; font: 13px/1.45 ui-monospace, Consolas, monospace; resize: vertical; }

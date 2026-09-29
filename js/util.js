@@ -33,6 +33,13 @@ const U = (() => {
     right: svg('<path d="M9.5 6l6 6-6 6"/>'),
     close: svg('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
   };
+  // Estat de verificació d'una fitxa (camp "verified"): classe CSS, clau de text i icona.
+  const VER = {
+    false: { cls: 'pending', key: 'ver.pending', icon: '○' },
+    true: { cls: 'ok', key: 'ver.ok', icon: '✓' },
+    error: { cls: 'err', key: 'ver.err', icon: '✗' },
+  };
+  const ver = v => VER[String(v)] || VER.false;
   const say = (text, label) => text
     ? `<button type="button" class="say" data-say="${esc(text)}" title="${esc(label || t('card.listen'))}" aria-label="${esc(label || t('card.listen'))}">${ICON.speaker}</button>`
     : '';
@@ -42,5 +49,5 @@ const U = (() => {
     const el = $('#toast'); el.textContent = msg; el.dataset.kind = kind || ''; el.hidden = false;
     clearTimeout(tt); tt = setTimeout(() => { el.hidden = true; }, 3500);
   }
-  return { $, esc, today, addDays, fmtDate, hira, plain, kun, mark, jisho, kanjiHref, shuffle, ICON, say, toast };
+  return { $, esc, today, addDays, fmtDate, hira, plain, kun, mark, jisho, kanjiHref, shuffle, ICON, ver, say, toast };
 })();

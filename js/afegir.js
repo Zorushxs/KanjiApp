@@ -3,10 +3,13 @@ const Afegir = (() => {
   const { esc } = U;
   const GROUPS = ['new', 'upd', 'same', 'err'];
   let input = '', paste = '', rows = null, error = '', done = '', lastArg = '', timer = null;
+  let regen = new Set(); // kanji que ja tens però que vols tornar a generar
   const pick = s => [...new Set(String(s).match(/\p{Script=Han}/gu) || [])];
+  // Van al prompt els nous i els que ja tens només si els has marcat per regenerar.
+  const forPrompt = () => pick(input).filter(ch => !Store.get(ch) || regen.has(ch));
 
   function render(root, arg) {
-    if (arg && arg !== lastArg) { input = arg; paste = ''; rows = null; error = ''; done = ''; } // ve de "Regenerar"
+    if (arg && arg !== lastArg) { input = arg; regen = new Set(pick(arg)); paste = ''; rows = null; error = ''; done = ''; } // ve de "Regenerar"
     lastArg = arg || '';
     root.innerHTML = `
       <h1 class="h">${esc(t('add.title'))}</h1>
@@ -39,32 +42,40 @@ const Afegir = (() => {
       clearTimeout(timer); timer = setTimeout(() => { runReview(); paintResult($); }, 350);
     };
     root.onclick = e => {
+      const c = e.target.closest('[data-ch]');
+      if (c) { const ch = c.dataset.ch; if (regen.has(ch)) regen.delete(ch); else regen.add(ch); paintPicked($); paintResult($); return; }
       const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'copy') copy($);
       else if (b.dataset.act === 'review') { clearTimeout(timer); runReview(); paintResult($); }
       else if (b.dataset.act === 'apply') {
         const r = Store.merge(rows.filter(x => x.status === 'new' || x.status === 'upd').map(x => x.item));
         done = t('add.applied', { a: r.added, u: r.updated });
-        input = ''; paste = ''; rows = null; error = '';
+        input = ''; paste = ''; rows = null; error = ''; regen = new Set();
         U.toast(done); render(root, lastArg);
       }
     };
   }
 
+  // Xips: els nous, fixos; els que ja tens, en gris i tocables per incloure'ls (regenerar) o treure'ls.
+  function chip(ch) {
+    if (!Store.get(ch)) return `<span class="kchip" lang="ja">${esc(ch)}</span>`;
+    const on = regen.has(ch);
+    return `<button type="button" class="kchip ${on ? 'regen' : 'has'}" lang="ja" data-ch="${esc(ch)}" aria-pressed="${on}" title="${esc(t(on ? 'add.regenChip' : 'add.exists'))}">${esc(ch)}${on ? ' ↻' : ''}</button>`;
+  }
   function paintPicked($) {
-    const ks = pick(input), box = $('.picked');
+    const ks = pick(input), go = forPrompt(), box = $('.picked');
     const has = ks.some(ch => Store.get(ch));
-    box.innerHTML = ks.map(ch => Store.get(ch)
-      ? `<span class="kchip has" lang="ja" title="${esc(t('add.exists'))}">${esc(ch)}</span>`
-      : `<span class="kchip" lang="ja">${esc(ch)}</span>`).join('') +
-      (has ? `<p class="hint">${esc(t('add.existsLegend'))}</p>` : '') +
-      (ks.length > 12 ? `<p class="warn">${esc(t('add.tooMany'))}</p>` : '');
-    $('.ptext').value = ks.length ? Prompt.build(ks) : '';
+    box.innerHTML = ks.map(chip).join('') +
+      (has ? `<p class="hint">${esc(go.length ? t('add.existsLegend') : t('add.allExist'))}</p>` : '') +
+      (has && go.length ? `<p class="hint"><b>${esc(t('add.inPrompt', { n: go.length }))}</b></p>` : '') +
+      (go.length > 12 ? `<p class="warn">${esc(t('add.tooMany'))}</p>` : '');
+    $('.ptext').value = go.length ? Prompt.build(go) : '';
   }
   async function copy($) {
-    const ks = pick(input);
+    const ks = pick(input), go = forPrompt();
     if (!ks.length) { U.toast(t('add.none'), 'warn'); $('.kin').focus(); return; }
-    try { await navigator.clipboard.writeText(Prompt.build(ks)); U.toast(t('add.copied')); }
+    if (!go.length) { U.toast(t('add.allExist'), 'warn'); return; }
+    try { await navigator.clipboard.writeText(Prompt.build(go)); U.toast(t('add.copied')); }
     catch { // sense permís de porta-retalls: obre el prompt perquè el copiïs a mà
       const d = $('.pview'), ta = $('.ptext'); d.open = true; ta.focus(); ta.select();
       U.toast(t('add.copyFail'), 'warn');
@@ -91,7 +102,7 @@ const Afegir = (() => {
     }
     if (!rows) { box.hidden = true; box.innerHTML = ''; return; }
     const by = g => rows.filter(r => r.status === g), n = by('new').length + by('upd').length;
-    const got = new Set(rows.map(r => r.kanji)), missing = pick(input).filter(ch => !got.has(ch));
+    const got = new Set(rows.map(r => r.kanji)), missing = forPrompt().filter(ch => !got.has(ch));
     box.hidden = false;
     box.innerHTML = `<h2><span class="n">3</span>${esc(t('add.step3'))}</h2>
       ${missing.length ? `<p class="warn">${esc(t('add.missing', { list: missing.join(' ') }))}</p>` : ''}

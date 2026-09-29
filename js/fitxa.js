@@ -46,7 +46,7 @@ const Fitxa = (() => {
               ${k.jlpt ? `<span class="pill">N${k.jlpt}</span>` : ''}
               ${k.strokes ? `<span class="pill">${esc(t('card.strokes', { n: k.strokes }))}</span>` : ''}
               <span class="pill">${esc(status)}</span>
-              <span class="pill ok" data-ver${k.verified ? '' : ' hidden'}>✓ ${esc(t('card.verified'))}</span>
+              <span class="pill" data-ver-pill hidden></span>
             </div>
             ${p ? `<p class="stats">${esc(t('card.stats', { seen: p.seen, fails: p.fails }))}</p>` : ''}
           </section>
@@ -70,7 +70,8 @@ const Fitxa = (() => {
           ${fold(t('card.trivia'), tr(k.trivia))}
           <section class="panel check">
             <h2>${esc(t('card.check'))}</h2>
-            <label class="tick"><input type="checkbox" data-act="verify"${k.verified ? ' checked' : ''}> ${esc(t('card.verifiedLabel'))}</label>
+            <button type="button" class="btn ver" data-act="verify"></button>
+            <p class="hint">${esc(t('ver.hint'))}</p>
             <div class="row">
               <a class="btn" href="${U.jisho(ch)}" target="_blank" rel="noopener">${esc(t('card.jisho'))} ↗</a>
               <a class="btn" href="#/afegir/${encodeURIComponent(ch)}">${esc(t('card.regen'))}</a>
@@ -80,6 +81,15 @@ const Fitxa = (() => {
         </div>
       </article>`;
 
+    // Botó de verificació de tres estats i la pastilla de dalt (que no surt mentre està per verificar).
+    const paintVer = () => {
+      const v = U.ver(k.verified), btn = root.querySelector('[data-act="verify"]'), pill = root.querySelector('[data-ver-pill]');
+      btn.className = `btn ver ver-${v.cls}`;
+      btn.textContent = `${v.icon} ${t(v.key)}`;
+      btn.setAttribute('aria-label', t('ver.label', { s: t(v.key) }));
+      pill.className = `pill ver-${v.cls}`; pill.textContent = `${v.icon} ${t(v.key)}`; pill.hidden = v.cls === 'pending';
+    };
+    paintVer();
     const so = root.querySelector('.so');
     Traces.mount(so, ch, k.strokes);
     root.onclick = e => {
@@ -89,14 +99,13 @@ const Fitxa = (() => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'replay') Traces.play(so);
       else if (b.dataset.act === 'so-retry') Traces.mount(so, ch, k.strokes);
+      else if (b.dataset.act === 'verify') { // per verificar → verificat → té errors → per verificar
+        const all = Validar.VERIFIED;
+        Store.setVerified(ch, all[(all.indexOf(k.verified) + 1) % all.length]); paintVer();
+      }
       else if (b.dataset.act === 'delete' && confirm(t('card.deleteConfirm', { k: ch }))) {
         Store.remove(ch); U.toast(t('card.deleted', { k: ch })); App.back();
       }
-    };
-    root.onchange = e => {
-      if (e.target.dataset.act !== 'verify') return;
-      Store.setVerified(ch, e.target.checked);
-      root.querySelector('[data-ver]').hidden = !e.target.checked;
     };
   }
   // Fletxes del teclat: kanji anterior i següent.
