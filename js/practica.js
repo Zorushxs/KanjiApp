@@ -1,15 +1,17 @@
 // Pràctica amb repetició espaiada (sistema Leitner de 5 caixes). Les caixes i els dies són a store.js.
 const Practica = (() => {
   const { esc } = U;
-  const KEY = 'kanji:practica', MODES = ['k2m', 'm2k', 'read'], SIZES = [10, 15, 20], GRADES = ['no', 'yes', 'doubt']; // ordre a la pantalla i tecles 1-2-3
-  const LEVELS = ['n5', 'n4', 'n3', 'n2', 'n1', 'none'];
+  const KEY = 'kanji:practica', MODES = ['k2m', 'm2k'], SIZES = [10, 15, 20], GRADES = ['no', 'yes', 'doubt']; // ordre a la pantalla i tecles 1-2-3
+  const LEVELS = ['n5', 'n4', 'n3', 'n2', 'n1', 'none'], KINDS = ['all', 'kanji', 'word'];
   let prefs = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
-  prefs = { mode: MODES.includes(prefs.mode) ? prefs.mode : 'k2m', size: SIZES.includes(prefs.size) ? prefs.size : 15, level: typeof prefs.level === 'string' ? prefs.level : 'all', again: prefs.again === true };
+  prefs = { mode: MODES.includes(prefs.mode) ? prefs.mode : 'k2m', size: SIZES.includes(prefs.size) ? prefs.size : 15, level: typeof prefs.level === 'string' ? prefs.level : 'all',
+    kind: KINDS.includes(prefs.kind) ? prefs.kind : 'all', again: prefs.again === true };
   const savePrefs = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch {} };
   // Sessió: { free, mode, queue: [{ ch, rep }], i, flipped, res, failed, done }. rep = segona passada d'una fallada.
   let s = null, root = null, screen = 'setup';
   const lv = k => (k.jlpt ? 'n' + k.jlpt : 'none');
-  const pool = () => Store.kanji.filter(k => prefs.level === 'all' || lv(k) === prefs.level);
+  const kind = k => (U.isWord(k.kanji) ? 'word' : 'kanji');
+  const pool = () => Store.kanji.filter(k => (prefs.level === 'all' || lv(k) === prefs.level) && (prefs.kind === 'all' || kind(k) === prefs.kind));
   const boxOf = ch => { const p = Store.prog(ch); return p ? p.box : 0; };
   const days = n => (n === 1 ? t('date.tomorrow') : t('pr.days', { n }));
 
@@ -29,8 +31,9 @@ const Practica = (() => {
       root.innerHTML = `<h1 class="h">${esc(t('pr.title'))}</h1><div class="empty"><p>${esc(t('pr.empty'))}</p><a class="btn primary" href="#/afegir">${esc(t('nav.add'))}</a></div>`;
       return;
     }
-    const levels = LEVELS.filter(l => all.some(k => lv(k) === l));
+    const levels = LEVELS.filter(l => all.some(k => lv(k) === l)), hasWords = all.some(k => kind(k) === 'word');
     if (prefs.level !== 'all' && !levels.includes(prefs.level)) prefs.level = 'all';
+    if (!hasWords) prefs.kind = 'all';
     const P = pool(), day = U.today();
     const due = P.filter(k => Store.isDue(k.kanji, day)).length, fresh = P.filter(k => !Store.prog(k.kanji)).length;
     const today = prefs.again ? P.filter(k => Store.doneToday(k.kanji)).length : 0;
@@ -50,6 +53,8 @@ const Practica = (() => {
         ${field('size', t('pr.size'), SIZES.map(z => radio('size', z, String(z), prefs.size === z)))}
         ${levels.length > 1 ? field('level', t('pr.level'), [radio('level', 'all', t('home.all'), prefs.level === 'all'),
           ...levels.map(l => radio('level', l, l === 'none' ? t('home.noLevel') : l.toUpperCase(), prefs.level === l))]) : ''}
+        ${hasWords ? field('kind', t('pr.kind'), [radio('kind', 'all', t('home.all'), prefs.kind === 'all'),
+          radio('kind', 'kanji', t('home.kanjiType'), prefs.kind === 'kanji'), radio('kind', 'word', t('home.wordType'), prefs.kind === 'word')]) : ''}
         <div class="toggle">
           <button type="button" class="switch" role="switch" aria-checked="${prefs.again}" data-act="again" aria-labelledby="againLbl" aria-describedby="againHint"><i></i></button>
           <div><span id="againLbl" class="toggle-l">${esc(t('pr.againToggle'))}</span><p id="againHint" class="hint">${esc(t('pr.againHint'))}</p></div>
@@ -63,6 +68,7 @@ const Practica = (() => {
       if (i.name === 'mode') prefs.mode = i.value;
       else if (i.name === 'size') prefs.size = +i.value;
       else if (i.name === 'level') prefs.level = i.value;
+      else if (i.name === 'kind') prefs.kind = i.value;
       else return;
       savePrefs(); setup();
       const f = root.querySelector(`input[name="${i.name}"]:checked`); if (f) f.focus();
@@ -97,26 +103,23 @@ const Practica = (() => {
   // ---------- Sessió ----------
   // Totes les lectures (la principal, destacada) amb el rōmaji al costat.
   function reads(k) {
+    if (!k.onyomi.length && !k.kunyomi.length) return ''; // les paraules només tenen la lectura principal
     const one = (r, fmt) => (U.isMain(k, r) ? `<b class="is-main">${fmt(r)}</b>` : fmt(r));
     const line = (label, arr, fmt) => arr.length
-      ? `<span class="rl"><small>${esc(label)}</small><span lang="ja">${arr.map(r => one(r, fmt)).join('、')}</span><span class="ros">${arr.map(U.ro).join(', ')}</span></span>` : '';
+      ? `<span class="rl"><small>${esc(label)}</small><span lang="ja">${arr.map(r => one(r, fmt)).join('、')}</span><span class="ros">${U.roList(arr)}</span></span>` : '';
     return `<div class="reads">${line(t('card.on'), k.onyomi, esc)}${line(t('card.kun'), k.kunyomi, U.kun)}</div>` +
       U.say([...k.onyomi, ...k.kunyomi].map(U.plain).join('、'), t('card.listenReadings'));
   }
   // La lectura que s'aprèn primer (camp "reading"), amb el rōmaji i la veu. Les fitxes antigues no en tenen.
-  const mainLine = (k, big) => (k.reading
-    ? `<div class="ans-main${big ? ' big' : ''}"><span lang="ja">${esc(k.reading)}</span>${U.ro(k.reading)}${U.say(k.reading, t('card.listenMain'))}</div>` : '');
+  const mainLine = k => (k.reading
+    ? `<div class="ans-main"><span lang="ja">${esc(k.reading)}</span>${U.ro(k.reading)}${U.say(k.reading, t('card.listenMain'))}</div>` : '');
+  // Revers: kanji → significat/lectura mostra el significat; significat → kanji, el kanji. Totes dues, les lectures.
   function back(k) {
     const means = esc(I18n.list(k.meanings).join(' · ')), emoji = k.emoji ? ` <span aria-hidden="true">${esc(k.emoji)}</span>` : '';
-    const mn = I18n.tr(k.mnemonic), ex = k.examples[0];
-    let main;
-    if (s.mode === 'k2m') main = `<div class="ans-m">${means}${emoji}</div>${mainLine(k)}<div class="ans-r">${reads(k)}</div>`;
-    else if (s.mode === 'm2k') main = `<div class="big-k" lang="ja">${esc(k.kanji)}</div>${mainLine(k)}<div class="ans-r">${reads(k)}</div>`;
-    else {
-      main = `${mainLine(k, true)}<div class="ans-r${k.reading ? '' : ' big'}">${reads(k)}</div><div class="ans-m small">${means}${emoji}</div>` +
-        (ex ? `<p class="ans-ex"><span lang="ja">${U.mark(ex.word, k.kanji)}</span> <span lang="ja">${esc(ex.reading)}</span> ${U.ro(ex.reading)} · ${esc(I18n.tr(ex.meaning))}</p>` : '');
-    }
-    return main + (mn ? `<p class="ans-mn">${esc(mn)}</p>` : '') + `<a class="lnk" href="${U.kanjiHref(k.kanji)}">${esc(t('pr.seeCard'))}</a>`;
+    const mn = I18n.tr(k.mnemonic);
+    const top = s.mode === 'm2k' ? `<div class="big-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</div>` : `<div class="ans-m">${means}${emoji}</div>`;
+    return top + mainLine(k) + `<div class="ans-r">${reads(k)}</div>` +
+      (mn ? `<p class="ans-mn">${esc(mn)}</p>` : '') + `<a class="lnk" href="${U.kanjiHref(k.kanji)}">${esc(t('pr.seeCard'))}</a>`;
   }
   function paint() {
     while (s.i < s.queue.length && !Store.get(s.queue[s.i].ch)) s.i++; // per si n'has esborrat algun a mitja sessió
@@ -124,7 +127,7 @@ const Practica = (() => {
     const it = s.queue[s.i], k = Store.get(it.ch), total = s.queue.length;
     const front = s.mode === 'm2k'
       ? `<div class="big-m">${esc(I18n.list(k.meanings).join(' · '))}</div>`
-      : `<div class="big-k" lang="ja">${esc(k.kanji)}</div>`;
+      : `<div class="big-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</div>`;
     const next = g => { const d = Store.nextDays(it.ch, g); return d === null ? t('pr.keep') : days(d); };
     const hint = g => (s.free || it.rep ? '' : `<small>${esc(next(g))}</small>`);
     root.innerHTML = `
@@ -133,7 +136,7 @@ const Practica = (() => {
         <div class="pbar" role="progressbar" aria-label="${esc(t('pr.progress'))}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${s.i}"><i style="width:${(s.i / total) * 100}%"></i></div>
         <span class="pos">${s.i + 1}/${total}</span>
       </div>
-      ${s.free ? `<p class="tag">${esc(t('pr.freeTag'))}</p>` : ''}
+      <div class="ses-tags">${s.free ? `<span class="tag">${esc(t('pr.freeTag'))}</span>` : ''}${U.romajiBtn()}</div>
       <div class="flash${s.flipped ? ' open' : ''}" ${s.flipped ? 'tabindex="-1"' : `role="button" tabindex="0" data-act="flip" aria-label="${esc(t('pr.flipLabel'))}"`}>
         ${it.rep ? `<span class="again">${esc(t('pr.again'))}</span>` : ''}
         <p class="q">${esc(t('pr.q.' + s.mode))}</p>
@@ -185,7 +188,7 @@ const Practica = (() => {
         ${s.free ? `<p class="tag">${esc(t('pr.freeTag'))}</p>` : ''}
         <div class="res">${GRADES.map(cell).join('')}</div>
         ${failed.length
-          ? `<h2>${esc(t('pr.toReview'))}</h2><div class="grid">${failed.map(k => `<a class="tile" href="${U.kanjiHref(k.kanji)}"><span class="tile-k" lang="ja">${esc(k.kanji)}</span><span class="tile-m">${esc(I18n.list(k.meanings)[0] || '')}</span></a>`).join('')}</div>`
+          ? `<h2>${esc(t('pr.toReview'))}</h2><div class="grid">${failed.map(k => `<a class="tile" href="${U.kanjiHref(k.kanji)}"><span class="tile-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</span><span class="tile-m">${esc(I18n.list(k.meanings)[0] || '')}</span></a>`).join('')}</div>`
           : `<p class="big-line">${esc(t('pr.perfect'))}</p>`}
         <div class="row"><button type="button" class="btn primary" data-act="again">${esc(t('pr.another'))}</button><a class="btn" href="#/">${esc(t('pr.home'))}</a></div>
       </section>`;

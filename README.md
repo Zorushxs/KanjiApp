@@ -1,18 +1,24 @@
 # Kanji
 
-Web per aprendre kanji practicant: fitxes amb lectures, veu, ordre de traços i mnemotècnia, i pràctica amb repetició espaiada (Leitner, 5 caixes). Funciona a mòbil i PC, en català, castellà i anglès, amb tema clar i fosc.
+Web per aprendre kanji (i paraules) practicant: fitxes amb lectures, veu, ordre de traços i mnemotècnia, i pràctica amb repetició espaiada (Leitner, 5 caixes). Funciona a mòbil i PC, en català, castellà i anglès, amb tema clar i fosc.
 
 HTML, CSS i JavaScript sense dependències ni compilació. Es publica tal qual amb GitHub Pages.
 
 ## Com s'afegeixen kanji
 
 1. A **Afegir**, tria com vols escollir els kanji i prem **Copiar prompt**:
-   - **Els escric jo**: escriu els kanji. Els que ja tens no hi van (surten en gris); toca'n un si el vols regenerar.
-   - **Que els triï Claude**: digues quants en vols i, si vols, una temàtica o unes paraules que vulguis saber escriure. El prompt porta tots els teus kanji perquè no te'n repeteixi cap.
+   - **Trio els kanjis**: escriu els kanji; per a una paraula sencera, posa-la entre 「」 (「学校」). Els que ja tens no hi van (surten en gris); toca'n un si el vols regenerar.
+   - **Claude tria els kanjis**: una temàtica i quants kanji en vols (si no hi poses número, 10) i, a més a més, les paraules concretes que vulguis saber escriure. Claude dona cada paraula tal com s'escriu habitualment al Japó i a nivell inicial (patata → じゃがいも, escola → 学校), en fa la fitxa i també la dels kanji nous que tingui. El prompt porta tots els teus kanji i paraules perquè no te'n repeteixi cap.
 2. Enganxa el prompt a [Claude.ai](https://claude.ai) i copia'n la resposta.
 3. Enganxa-la a l'app: la valida, en mostra una previsualització (nous, actualitzats, errors) i la fusiona per caràcter.
 
 Si regeneres un kanji que ja tens, se'n substitueix el contingut i se'n conserva el progrés de pràctica.
+
+## Inici
+
+La graella té filtres per nivell (N5, N4…) i per tipus (**Kanji** o **Paraules**; sense cap, es veuen tots dos). Amb els interruptors de **Mostrar** pots amagar els significats de sota de cada fitxa (per provar-te) i el rōmaji de tota l'app. Es recorden en aquest navegador.
+
+A la fitxa d'un kanji passes a l'anterior o la següent amb les fletxes (també les del teclat) i, al mòbil, lliscant el dit cap a la dreta o cap a l'esquerra.
 
 ## Pràctica i calendari
 
@@ -35,7 +41,7 @@ Tot es desa en un JSON: el tries amb **Crear arxiu / Obrir existent** (Chrome i 
 
 `last` és l'últim dia que l'has practicat, i `history`, quantes respostes has donat cada dia (per al calendari).
 
-El format de cada kanji és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. `reading` és la lectura que s'aprèn primer (一 → いち) i `sentence.romaji`, la frase en rōmaji; el rōmaji de les paraules i lectures el calcula l'app a partir del kana. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors).
+El format de cada fitxa és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. Una fitxa pot ser un kanji sol o una **paraula**: llavors `kanji` porta la paraula sencera (学校, 食べる, じゃがいも), `onyomi` i `kunyomi` van buits, `strokes` és `null` i `reading` és com es llegeix tota la paraula. `reading` és la lectura que s'aprèn primer (一 → いち) i `sentence.romaji`, la frase en rōmaji; el rōmaji de les paraules i lectures el calcula l'app a partir del kana. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors).
 
 ## Veu
 

@@ -71,7 +71,7 @@ mark { background: none; color: var(--accent); }
 .badge { position: absolute; top: 4px; left: calc(50% + 7px); min-width: 19px; padding: 1px 5px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 11px; line-height: 17px; text-align: center; }
 
 /* ---------- Estructura ---------- */
-.main { flex: 1; width: 100%; max-width: 1040px; margin: 0 auto; padding: 16px; }
+.main { flex: 1; width: 100%; max-width: 1040px; margin: 0 auto; padding: 16px; overflow-x: hidden; overflow-x: clip; } /* la fitxa que surt en lliscar no fa barra horitzontal */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
 .panel h2 {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px;
@@ -121,6 +121,15 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .chip { flex: none; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 5px 13px; font-size: 14px; color: var(--mute); }
 .chip.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .found { margin: 0 0 10px; color: var(--mute); font-size: 14px; }
+.chips-sep { flex: none; width: 1px; margin: 4px 4px; background: var(--line); }
+/* "Mostrar: significats · rōmaji" (interruptors petits sota la cerca). */
+.view-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: -2px 0 12px; font-size: 14px; color: var(--mute); }
+.toggle.small { align-items: center; gap: 8px; color: var(--ink); font-weight: 600; cursor: pointer; }
+.toggle.small .switch { width: 38px; height: 22px; margin: 0; }
+.toggle.small .switch i { width: 16px; height: 16px; }
+.toggle.small .switch[aria-checked="true"] i { transform: translateX(16px); }
+.grid.hide-m .tile-m { visibility: hidden; } /* s'amaga però conserva el lloc: les targetes no canvien de mida */
+[data-romaji="off"] .ro, [data-romaji="off"] .rd-ro, [data-romaji="off"] .ros { display: none !important; }
 .found:empty { display: none; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .tile {
@@ -130,6 +139,11 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 }
 .tile:hover { border-color: var(--accent); transform: translateY(-1px); }
 .tile-k { font: 400 46px/1.15 var(--jp-k); }
+/* Paraules: com més llargues, més petites, perquè hi càpiguen. */
+.tile-k.w2, .tile-k.w3, .tile-k.w4 { display: flex; align-items: center; justify-content: center; min-height: 53px; max-width: 100%; line-height: 1.25; text-align: center; overflow-wrap: anywhere; }
+.tile-k.w2 { font-size: 34px; }
+.tile-k.w3 { font-size: 25px; }
+.tile-k.w4 { font-size: 17px; }
 .tile-m { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--mute); }
 .tile-ver { position: absolute; top: 6px; left: 9px; font-size: 12px; font-weight: 700; }
 .tile-ver.ver-ok { color: var(--ok); } .tile-ver.ver-err { color: var(--danger); }
@@ -146,12 +160,31 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .bar .back { margin-left: -8px; }
 .pos { margin-left: auto; color: var(--mute); font-size: 14px; font-variant-numeric: tabular-nums; }
+.bar .tag-btn { margin-left: auto; }
+.bar .tag-btn + .pos { margin-left: 4px; }
 .sheet { display: grid; gap: 12px; }
+/* Lliscar entre fitxes (pantalles tàctils): el desplaçament vertical el fa el navegador; l'horitzontal, fitxa.js.
+   La fitxa nova entra pel costat contrari del que ha sortit l'anterior. */
+@media (pointer: coarse) { .sheet { touch-action: pan-y; } }
+.sheet.enter-right { animation: enter-right .2s ease-out; }
+.sheet.enter-left { animation: enter-left .2s ease-out; }
+@keyframes enter-right { from { transform: translateX(35%); opacity: 0; } }
+@keyframes enter-left { from { transform: translateX(-35%); opacity: 0; } }
 .col { display: grid; gap: 12px; align-content: start; min-width: 0; }
 .hero { position: relative; text-align: center; padding: 22px 16px 18px; }
 .hero > .say { position: absolute; top: 12px; left: 12px; }
 .emoji { position: absolute; top: 10px; right: 14px; font-size: 32px; line-height: 1.2; }
 .hero-k { font: 400 clamp(128px, 40vw, 190px)/1.05 var(--jp-k); }
+.hero-k.w2, .big-k.w2 { font-size: clamp(84px, 26vw, 124px); }
+.hero-k.w3, .big-k.w3 { font-size: clamp(60px, 18vw, 90px); }
+.hero-k.w4, .big-k.w4 { font-size: clamp(36px, 11vw, 58px); line-height: 1.3; overflow-wrap: anywhere; }
+/* Paraules: els kanji que la formen, enllaçats a la seva fitxa si ja els tens. */
+.kparts { display: flex; flex-wrap: wrap; gap: 8px; }
+.kpart { display: grid; justify-items: center; gap: 2px; min-width: 66px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); text-decoration: none; }
+.kpart span { font: 400 30px/1.1 var(--jp-k); }
+.kpart small { font-size: 12px; color: var(--mute); }
+a.kpart:hover { border-color: var(--accent); }
+.kpart.off { opacity: .6; }
 .means { font: 700 24px/1.25 var(--serif); margin: 8px 0 12px; overflow-wrap: anywhere; }
 .facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .pill { padding: 3px 10px; border-radius: 999px; background: var(--hover); color: var(--mute); font-size: 13px; }
@@ -226,7 +259,8 @@ button.kchip { font-family: var(--jp); }
 .pview { margin-top: 12px; }
 .step .seg { margin: 2px 0 8px; }
 /* "Que els triï Claude": quants, temàtica i paraules. */
-.fields { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+.fields { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; margin-top: 10px; }
+.fld small.hint { margin: 2px 0 0; font-weight: 400; font-size: 13px; }
 .fld { display: grid; gap: 4px; align-content: start; font-size: 13.5px; font-weight: 600; color: var(--mute); }
 .fld.wide { grid-column: 1 / -1; }
 .fld input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); color: var(--ink); font-size: 16px; font-weight: 400; }
@@ -280,6 +314,13 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .pbar i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
 .ses-top .pos { margin-left: 0; }
 .tag { display: inline-block; margin: 0 0 10px; padding: 3px 10px; border-radius: 999px; background: var(--hover); color: var(--mute); font-size: 13px; }
+.ses-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.ses-tags .tag { margin: 0; }
+.ses-tags .tag-btn { margin-left: auto; } /* a la dreta, just sota del «1/10» */
+/* Botó «Rōmaji» (fitxa i pràctica): pastilla com «Repàs lliure»; premut (ple) quan el rōmaji es veu. */
+.tag-btn { margin: 0; border: 1px solid var(--line); background: var(--panel); cursor: pointer; line-height: 1.5; }
+.tag-btn:hover { border-color: var(--mute); color: var(--ink); }
+.tag-btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .flash {
   position: relative; max-width: 560px; min-height: 300px; margin: 0 auto; padding: 26px 18px 22px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
@@ -298,20 +339,14 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .big-m { font: 700 clamp(26px, 7vw, 34px)/1.25 var(--serif); padding: 24px 0; overflow-wrap: anywhere; }
 .rev { width: 100%; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); display: grid; justify-items: center; gap: 10px; }
 .ans-m { font: 700 24px/1.3 var(--serif); overflow-wrap: anywhere; }
-.ans-m.small { font-size: 18px; }
 .ans-r { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .reads { display: grid; gap: 2px; font-size: 21px; line-height: 1.4; text-align: left; }
 .reads small { display: inline-block; min-width: 64px; font: 600 12px var(--sans); color: var(--mute); }
-.ans-r.big .reads { font-size: 27px; }
 .reads .rl { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline; }
 .reads .rl small { grid-row: 1 / span 2; }
 .reads .ros { grid-column: 2; font-size: 18px; line-height: 1.1; margin-bottom: 4px; }
 .ans-main { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 28px; line-height: 1.2; }
-.ans-main.big { font-size: 42px; }
 .ans-main .ro { font-size: 16px; }
-.ans-main.big .ro { font-size: 19px; }
-.ans-ex { margin: 0; font-size: 15px; }
-.ans-ex span:first-child { font-size: 20px; }
 .ans-mn { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 15px; text-align: left; }
 .answer { max-width: 560px; margin: 14px auto 0; }
 .answer > .btn.big { display: flex; margin-inline: auto; } /* "Girar", centrat sota la targeta */

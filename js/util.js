@@ -49,13 +49,19 @@ const U = (() => {
   }
   // Rōmaji petit al costat del kana. Les lectures kun porten un punt (た.べる) que no es llegeix.
   const ro = text => (text ? `<span class="ro" lang="ja-Latn">${esc(romaji(String(text).replace(/\./g, '')))}</span>` : '');
+  // Una llista de lectures en un sol bloc de rōmaji (així, si l'amagues, no hi queden comes soltes).
+  const roList = arr => (arr.length ? `<span class="ro" lang="ja-Latn">${arr.map(r => esc(romaji(String(r).replace(/\./g, '')))).join(', ')}</span>` : '');
   // És la lectura principal del kanji (camp "reading")? Val la paraula sencera (たべる) o només l'arrel (た).
   const isMain = (k, r) => !!k.reading && [plain(r), String(r).split('.')[0].replace(/-/g, '')].some(x => hira(x) === k.reading);
   // Kun'yomi amb l'okurigana (el que va després del punt) més clar.
   const kun = r => { const [a, b] = String(r).split('.'); return esc(a) + (b ? `<span class="oku">${esc(b)}</span>` : ''); };
   // Ressalta el kanji dins d'una paraula o frase. ch sempre és un kanji validat, no cal escapar-lo.
   const mark = (text, ch) => esc(text).split(ch).join(`<mark>${ch}</mark>`);
-  const jisho = ch => 'https://jisho.org/search/' + encodeURIComponent(ch + ' #kanji');
+  // Una fitxa és una paraula si no és un sol kanji (学校, 食べる, じゃがいも).
+  const isWord = s => !/^\p{Script=Han}$/u.test(String(s));
+  // Classe de mida per a les paraules llargues (perquè hi càpiguen a la graella, la fitxa i la pràctica).
+  const size = s => { const n = [...String(s)].length; return n < 2 ? '' : n === 2 ? ' w2' : n === 3 ? ' w3' : ' w4'; };
+  const jisho = ch => 'https://jisho.org/search/' + encodeURIComponent(isWord(ch) ? ch : ch + ' #kanji');
   const kanjiHref = ch => '#/k/' + encodeURIComponent(ch);
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
@@ -78,10 +84,29 @@ const U = (() => {
     ? `<button type="button" class="say" data-say="${esc(text)}" title="${esc(label || t('card.listen'))}" aria-label="${esc(label || t('card.listen'))}">${ICON.speaker}</button>`
     : '';
 
+  // Preferències de visualització, recordades en aquest navegador: significats a la graella i rōmaji a tot arreu.
+  const PREFS = 'kanji:vista', DEFAULT = { meanings: true, romaji: true };
+  const prefs = (() => { try { return { ...DEFAULT, ...JSON.parse(localStorage.getItem(PREFS)) }; } catch { return { ...DEFAULT }; } })();
+  function pref(k, v) {
+    if (v === undefined) return prefs[k];
+    prefs[k] = v; try { localStorage.setItem(PREFS, JSON.stringify(prefs)); } catch {}
+    return v;
+  }
+
+  // Rōmaji visible o amagat a tota l'app: el CSS amaga els .ro segons <html data-romaji>, i els controls
+  // (interruptor de l'inici i botó «Rōmaji» de la fitxa i la pràctica) es posen tots al mateix estat.
+  function setRomaji(v) {
+    pref('romaji', v);
+    document.documentElement.dataset.romaji = v ? 'on' : 'off';
+    document.querySelectorAll('[data-romaji-toggle]').forEach(b => b.setAttribute('aria-pressed', v));
+    document.querySelectorAll('[data-pref="romaji"]').forEach(b => b.setAttribute('aria-checked', v));
+  }
+  const romajiBtn = () => `<button type="button" class="tag tag-btn" data-romaji-toggle aria-pressed="${pref('romaji')}">${esc(t('home.showRomaji'))}</button>`;
+
   let tt = null;
   function toast(msg, kind) {
     const el = $('#toast'); el.textContent = msg; el.dataset.kind = kind || ''; el.hidden = false;
     clearTimeout(tt); tt = setTimeout(() => { el.hidden = true; }, Math.max(3500, msg.length * 60)); // els llargs, més estona
   }
-  return { $, esc, today, addDays, fmtDate, hira, plain, romaji, ro, isMain, kun, mark, jisho, kanjiHref, shuffle, ICON, ver, say, toast };
+  return { $, esc, today, addDays, fmtDate, hira, plain, romaji, ro, roList, isMain, isWord, size, pref, setRomaji, romajiBtn, kun, mark, jisho, kanjiHref, shuffle, ICON, ver, say, toast };
 })();

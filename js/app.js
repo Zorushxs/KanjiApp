@@ -48,6 +48,9 @@ const App = (() => {
   const setTheme = th => { document.documentElement.dataset.theme = th; try { localStorage.setItem('kanji:tema', th); } catch {} };
   if (!document.documentElement.dataset.theme) setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+  // Rōmaji visible o amagat a tot arreu: interruptor a l'inici i botó «Rōmaji» a la fitxa i a la pràctica.
+  U.setRomaji(U.pref('romaji'));
+  document.addEventListener('click', e => { if (e.target.closest('[data-romaji-toggle]')) U.setRomaji(!U.pref('romaji')); });
 
   // Un botó per cada idioma d'i18n.js, amb el nom de l'idioma escrit en el mateix idioma.
   $('#langs').innerHTML = I18n.langs.map(l => `<button type="button" data-lang="${l}" lang="${l}" title="${esc(I18n.name(l))}" aria-label="${esc(I18n.name(l))}">${l.toUpperCase()}</button>`).join('');

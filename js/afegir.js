@@ -4,17 +4,29 @@ const Afegir = (() => {
   const { esc } = U;
   const GROUPS = ['new', 'upd', 'same', 'have', 'err'], KEY = 'kanji:afegir';
   const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
-  let mode = saved.mode === 'more' ? 'more' : 'own', nRaw = String(saved.n || 10), theme = '', words = '';
+  let mode = saved.mode === 'more' ? 'more' : 'own', nRaw = '', theme = '', words = '';
   let input = '', paste = '', rows = null, note = '', error = '', done = '', lastArg = '', timer = null;
-  let regen = new Set(); // kanji que ja tens però que vols tornar a generar
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ mode, n: count() })); } catch {} };
-  const pick = s => [...new Set(String(s).match(/\p{Script=Han}/gu) || [])];
-  const count = () => Math.min(30, Math.max(1, parseInt(nRaw, 10) || 10)); // quants en demanes (1-30)
+  let regen = new Set(); // kanji o paraules que ja tens però que vols tornar a generar
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ mode })); } catch {} };
+  // Kanji sols (cada kanji que escriguis) i paraules senceres entre 「」 (「学校」, 「じゃがいも」).
+  const pick = s => {
+    const out = [];
+    String(s).replace(/「([^」]*)」|\p{Script=Han}/gu, (m, w) => {
+      const x = w === undefined ? m : w.trim();
+      if (Validar.isCard(x) && !out.includes(x)) out.push(x);
+      return '';
+    });
+    return out;
+  };
+  // Quants kanji de la temàtica (1-30). El camp és buit amb un 10 d'exemple: buit vol dir 10.
+  const count = () => Math.min(30, Math.max(1, parseInt(nRaw, 10) || 10));
   // Van al prompt els nous i els que ja tens només si els has marcat per regenerar.
   const forPrompt = () => pick(input).filter(ch => !Store.get(ch) || regen.has(ch));
-  const prompt = () => (mode === 'more'
-    ? Prompt.more({ have: Store.kanji.map(k => k.kanji), n: count(), theme, words, lang: I18n.lang })
-    : (forPrompt().length ? Prompt.cards(forPrompt()) : ''));
+  const prompt = () => {
+    if (mode === 'own') return forPrompt().length ? Prompt.cards(forPrompt()) : '';
+    const all = Store.kanji.map(k => k.kanji);
+    return Prompt.more({ have: all.filter(x => !U.isWord(x)), haveWords: all.filter(U.isWord), n: count(), theme, words });
+  };
 
   function render(root, arg) {
     if (arg && arg !== lastArg) { mode = 'own'; input = arg; regen = new Set(pick(arg)); paste = ''; rows = null; error = ''; done = ''; } // ve de "Regenerar"
@@ -34,9 +46,10 @@ const Afegir = (() => {
         <div class="mode-more"${mode === 'more' ? '' : ' hidden'}>
           <p class="hint">${esc(have ? t('add.moreHint', { n: have }) : t('add.moreHint0'))}</p>
           <div class="fields">
-            <label class="fld"><span>${esc(t('add.howMany'))}</span><input class="more-n" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" value="${esc(nRaw)}"></label>
             <label class="fld"><span>${esc(t('add.theme'))}</span><input class="more-theme" value="${esc(theme)}" placeholder="${esc(t('add.themePh'))}" autocomplete="off"></label>
-            <label class="fld wide"><span>${esc(t('add.words'))}</span><input class="more-words" value="${esc(words)}" placeholder="${esc(t('add.wordsPh'))}" autocomplete="off"></label>
+            <label class="fld"><span>${esc(t('add.howMany'))}</span><input class="more-n" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" value="${esc(nRaw)}" placeholder="10"></label>
+            <label class="fld wide"><span>${esc(t('add.words'))}</span><input class="more-words" value="${esc(words)}" placeholder="${esc(t('add.wordsPh'))}" autocomplete="off">
+              <small class="hint">${esc(t('add.wordsHint'))}</small></label>
           </div>
         </div>
         <div class="row">
@@ -59,7 +72,7 @@ const Afegir = (() => {
 
     $('.kin').oninput = e => { input = e.target.value; paintPicked($); paintResult($); };
     // Camp de text (sense fletxetes) amb teclat numèric: només s'hi queden les xifres.
-    $('.more-n').oninput = e => { e.target.value = e.target.value.replace(/\D/g, ''); nRaw = e.target.value; save(); };
+    $('.more-n').oninput = e => { e.target.value = e.target.value.replace(/\D/g, ''); nRaw = e.target.value; };
     $('.more-theme').oninput = e => { theme = e.target.value; };
     $('.more-words').oninput = e => { words = e.target.value; };
     $('.paste').oninput = e => {

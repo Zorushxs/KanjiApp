@@ -1,4 +1,4 @@
-// Llegeix la resposta de la IA, en valida els camps i li dona la forma exacta d'un kanji.
+// Llegeix la resposta de la IA, en valida els camps i li dona la forma exacta d'una fitxa (kanji o paraula).
 // Aquí es neteja tot el text i, a més, les pantalles l'escapen en pintar-lo: no ens refiem mai del contingut.
 const Validar = (() => {
   const HAN = /^\p{Script=Han}$/u;
@@ -13,6 +13,10 @@ const Validar = (() => {
   const TXT = 400, LONG = 650; // longitud màxima dels textos explicatius (origen i curiositat, més llargs)
   const LANGS = ['ca', 'es', 'en']; // idiomes del contingut (els que demana el prompt)
   const VERIFIED = [false, true, 'error']; // per verificar · verificat · té errors
+  // Què pot anar al camp "kanji": un kanji sol o una paraula japonesa (kanji, kana o barreja), sense espais.
+  const WORD = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆]{1,15}$/u;
+  const isCard = s => typeof s === 'string' && (HAN.test(s) || WORD.test(s));
+  const isWord = s => isCard(s) && !HAN.test(s);
 
   // Avisos sense repetir: { k: clau de i18n, p: valors }.
   const notes = () => {
@@ -41,7 +45,7 @@ const Validar = (() => {
     o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
     const m = o.meanings, s = o.sentence && typeof o.sentence === 'object' ? o.sentence : {};
     return {
-      kanji: str(o.kanji, 8),
+      kanji: str(o.kanji, 20),
       meanings: Array.isArray(m) || typeof m === 'string'
         ? byLang(l => (l === 'en' ? words(m, 60, n) : []))
         : byLang(l => words(m && m[l], 60, n)),
@@ -68,13 +72,18 @@ const Validar = (() => {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { item: null, kanji: '', errors: [{ k: 'val.notObject' }], warnings: [] };
     const k = coerce(raw, n);
     k.verified = false; // només el marques tu, des de la fitxa
-    if (!HAN.test(k.kanji)) errors.push({ k: 'val.kanji', p: { v: k.kanji || '—' } });
+    // Una fitxa és un kanji sol o una paraula (学校, 食べる, じゃがいも): les paraules no tenen on/kun ni traços.
+    const word = isWord(k.kanji);
+    if (!isCard(k.kanji)) errors.push({ k: 'val.kanji', p: { v: k.kanji || '—' } });
     if (LANGS.every(l => !k.meanings[l].length)) errors.push({ k: 'val.meanings' });
-    if (!k.onyomi.length && !k.kunyomi.length) errors.push({ k: 'val.readings' });
-    k.onyomi.forEach(v => { if (!ON.test(v)) errors.push({ k: 'val.on', p: { v } }); });
-    k.kunyomi.forEach(v => { if (!KUN.test(v)) errors.push({ k: 'val.kun', p: { v } }); });
-    if (k.strokes === null) {
-      if (raw.strokes == null || raw.strokes === '') n.add('val.noStrokes'); else errors.push({ k: 'val.strokes' });
+    if (word) { k.onyomi = []; k.kunyomi = []; k.strokes = null; }
+    else {
+      if (!k.onyomi.length && !k.kunyomi.length) errors.push({ k: 'val.readings' });
+      k.onyomi.forEach(v => { if (!ON.test(v)) errors.push({ k: 'val.on', p: { v } }); });
+      k.kunyomi.forEach(v => { if (!KUN.test(v)) errors.push({ k: 'val.kun', p: { v } }); });
+      if (k.strokes === null) {
+        if (raw.strokes == null || raw.strokes === '') n.add('val.noStrokes'); else errors.push({ k: 'val.strokes' });
+      }
     }
     if (k.jlpt === null && raw.jlpt != null && raw.jlpt !== '' && raw.jlpt !== 0) n.add('val.jlpt');
     if (k.emoji && !EMOJI.test(k.emoji)) { k.emoji = ''; n.add('val.emoji'); }
@@ -82,12 +91,14 @@ const Validar = (() => {
     const given = Array.isArray(raw.examples) ? Math.min(raw.examples.length, 5) : 0;
     k.examples = k.examples.filter(e => JP.test(e.word) && KANA.test(e.reading)).slice(0, 5);
     if (k.examples.length < given) n.add('val.example');
-    k.examples.forEach(e => { if (HAN.test(k.kanji) && !e.word.includes(k.kanji)) n.add('val.exampleNoKanji', { v: e.word }); });
+    if (!word) k.examples.forEach(e => { if (HAN.test(k.kanji) && !e.word.includes(k.kanji)) n.add('val.exampleNoKanji', { v: e.word }); });
     if (k.sentence.reading && !KANA.test(k.sentence.reading)) n.add('val.sentenceReading');
     if (k.sentence.romaji && !ROMA.test(k.sentence.romaji)) { k.sentence.romaji = ''; n.add('val.romaji'); }
 
-    // Lectura principal: en kana (es desa en hiragana) i, si pot ser, una de les lectures de la llista.
-    if (!k.reading) n.add('val.noReading');
+    // Lectura principal: en kana. D'un kanji, es desa en hiragana i hauria de ser una de les seves lectures;
+    // d'una paraula és obligatòria (és com es llegeix tota la paraula) i es deixa tal com ve.
+    if (word) { if (!READ.test(k.reading)) { errors.push({ k: 'val.wordReading' }); } }
+    else if (!k.reading) n.add('val.noReading');
     else if (!READ.test(k.reading)) { n.add('val.reading', { v: k.reading }); k.reading = ''; }
     else {
       k.reading = U.hira(k.reading);
@@ -150,5 +161,5 @@ const Validar = (() => {
     });
     return rows;
   }
-  return { coerce, check, extract, review, note, VERIFIED };
+  return { coerce, check, extract, review, note, isCard, isWord, VERIFIED };
 })();

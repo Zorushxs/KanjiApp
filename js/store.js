@@ -1,22 +1,23 @@
-// Estat en memòria: el contingut ("kanji"), el progrés de pràctica ("progress", pel caràcter) i quantes
+// Estat en memòria: el contingut ("kanji": fitxes de kanji sols i de paraules), el progrés de pràctica
+// ("progress", pel camp "kanji" de cada fitxa) i quantes
 // respostes has donat cada dia ("history", per al calendari). El progrés viu a part perquè regenerar
 // un kanji no l'esborri. Desa només amb Almacen.
 const Store = (() => {
   let data = { version: 1, kanji: [], progress: {}, history: {} }, timer = null, onStatus = () => {};
   const DAYS = [0, 1, 3, 7, 14, 30]; // dies fins al proper repàs segons la caixa (1-5)
-  const HAN = /^\p{Script=Han}$/u, DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
   const nat = v => (Number.isInteger(v) && v > 0 ? v : 0);
 
   function norm(d) {
     const kanji = [], seen = new Set();
     (Array.isArray(d && d.kanji) ? d.kanji : []).forEach(o => {
       const k = Validar.coerce(o);
-      if (HAN.test(k.kanji) && !seen.has(k.kanji)) { seen.add(k.kanji); kanji.push(k); }
+      if (Validar.isCard(k.kanji) && !seen.has(k.kanji)) { seen.add(k.kanji); kanji.push(k); }
     });
     const progress = {}, src = d && d.progress && typeof d.progress === 'object' ? d.progress : {};
     Object.keys(src).forEach(ch => {
       const p = src[ch];
-      if (!HAN.test(ch) || !p || typeof p !== 'object') return;
+      if (!Validar.isCard(ch) || !p || typeof p !== 'object') return;
       progress[ch] = { box: Math.min(5, Math.max(1, parseInt(p.box, 10) || 1)), due: DATE.test(p.due) ? p.due : U.today(), seen: nat(p.seen), fails: nat(p.fails) };
       if (DATE.test(p.last)) progress[ch].last = p.last; // últim dia que l'has practicat
     });

@@ -1,10 +1,11 @@
-// Prompts per a Claude.ai (en anglès). Tots dos acaben amb el mateix format de fitxa (FORMAT):
-// - cards(): fitxes dels kanji que has escrit tu.
-// - more(): que Claude en triï de nous sense repetir els que ja tens (quants, temàtica i paraules opcionals).
+// Prompts per a Claude.ai (en anglès). Tots dos acaben amb el mateix format de fitxa (FORMAT); una fitxa
+// pot ser un kanji sol o una paraula (学校, 食べる, じゃがいも):
+// - cards(): fitxes dels kanji i paraules que has escrit tu.
+// - more(): que Claude en triï de nous sense repetir els que ja tens (temàtica + quants, i paraules a més a més).
 const Prompt = (() => {
   const FORMAT = `Every explanatory text must be written in Catalan ("ca"), Spanish ("es") and English ("en").
 
-Reply ONLY with one \`\`\`json code block containing a list of objects with exactly
+Reply ONLY with one \`\`\`json code block containing a list of card objects with exactly
 these fields:
 [
   {
@@ -26,6 +27,15 @@ these fields:
     "verified": false
   }
 ]
+
+A card is usually one kanji, like the example above. A card can also be a WORD (a compound
+of several kanji, kanji with hiragana, or only kana). For a word card use the same fields, with:
+- "kanji": the whole word as it is normally written in Japan (学校, 食べる, じゃがいも);
+- "onyomi": [], "kunyomi": [] and "strokes": null;
+- "reading": the whole word in hiragana (in katakana if the word is written in katakana);
+- "jlpt": the level of the word; "origin": the origin of the word, only if you are sure;
+- "examples": 2-3 short, common phrases that use the word.
+A word made of one single kanji (like 木) is a normal kanji card.
 
 Rules:
 - On'yomi in katakana; kun'yomi in hiragana, with okurigana separated by a dot (た.べる).
@@ -60,38 +70,40 @@ Language style:
 
   const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
 
+  // list: kanji sols i paraules (les paraules les escrius entre 「」 a la pantalla Afegir).
   function cards(list) {
-    return `You are a Japanese teacher. Create study cards for these kanji: ${list.join('、')}
+    const ks = list.filter(x => !U.isWord(x)), ws = list.filter(U.isWord);
+    const what = [ks.length && `these kanji: ${ks.join('、')}`, ws.length && `these words: ${ws.join('、')}`].filter(Boolean).join(', and ');
+    return `You are a Japanese teacher. Create study cards for ${what}.
 
 I'm a beginner: I know hiragana and katakana, but few kanji. ${FORMAT}`;
   }
 
-  const LANG = { ca: 'Catalan', es: 'Spanish', en: 'English' };
-
-  // "Els kanjis que tinc apresos són [llista] i en vull aprendre X d'aquesta temàtica i/o d'aquestes paraules."
-  // have: tots els kanji de la col·lecció; n: quants en vols; theme i words: opcionals, tal com els escrius;
-  // lang: idioma de la interfície, per a l'avís de paraules que s'escriuen en kana.
-  function more({ have, n, theme, words, lang }) {
+  // "Els kanjis que tinc apresos són [llista] i en vull aprendre X d'aquesta temàtica; i, a més, aquestes paraules."
+  // have / haveWords: els kanji sols i les paraules de la col·lecció; n: quants kanji de la temàtica (o, sense
+  // temàtica ni paraules, dels més útils); words: paraules concretes, que van a més a més i no compten per a n.
+  function more({ have, haveWords = [], n, theme, words }) {
     const t = clean(theme), w = clean(words);
-    const known = have.length
-      ? `The kanji I have already learned are: ${have.join(', ')}`
-      : `I haven't learned any kanji yet.`;
-    const about = t && `about this theme: "${t}"`;
-    const from = w && `the ones needed to write these specific words: ${w} (they may be written in Catalan, Spanish or English)`;
-    const want = about && from ? `${about}, and/or ${from}`
-      : about || from || 'the most useful ones for a beginner, in the usual learning order (JLPT N5 first, then N4)';
+    const known = [
+      have.length ? `The kanji I have already learned are: ${have.join(', ')}` : `I haven't learned any kanji yet.`,
+      haveWords.length && `The words I have already learned are: ${haveWords.join(', ')}`,
+    ].filter(Boolean).join('\n');
+    const kanjiPart = (t || !w) && `I want to learn ${n} new kanji: ${t ? `about this theme: "${t}"`
+      : 'the most useful ones for a beginner, in the usual learning order (JLPT N5 first, then N4)'}.
+Only choose kanji that are normally used in everyday writing (not ones usually replaced by kana).`;
+    const wordPart = w && `${t ? 'In addition to those kanji, I' : 'I'} want to learn these specific words: ${w}
+(they may be written in Catalan, Spanish or English). For each one, choose the word a Japanese
+person would normally use in everyday life, at beginner level, written the way it is normally
+written in Japan: it can be a compound of several kanji, kanji with hiragana, or only kana
+(e.g. patata → じゃがいも, not 芋; escola → 学校). Make a word card for each of these words, and
+also a kanji card for each kanji in them that I haven't learned yet.`;
     return `You are a Japanese teacher. I'm a beginner: I know hiragana and katakana.
 ${known}
 
-I want to learn ${n} new kanji: ${want}.
-Don't include any of the kanji I have already learned. Only choose kanji that are normally
-used in everyday writing (not ones usually replaced by kana).${w ? ` If the words need more than ${n} new kanji, pick the most useful ones.
-If one of my words is normally written in kana even though it has a kanji (e.g. りんご rather
-than 林檎), don't choose kanji for it. Instead, before the \`\`\`json block, write one short line in
-${LANG[lang] || 'Catalan'} listing those words and how they are normally written. That line is the only
-text allowed outside the code block.` : ''}
+${[kanjiPart, wordPart].filter(Boolean).join('\n\n')}
+Never repeat a kanji or a word I have already learned.
 
-Create a study card for each new kanji. ${FORMAT}`;
+${FORMAT}`;
   }
 
   return { cards, more };
