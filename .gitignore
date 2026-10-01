@@ -1,2 +1,8 @@
 # El teu arxiu de dades (kanji + progrés) és personal: que no es publiqui per error a GitHub Pages.
 kanji.json
+
+# Resultat de les proves al navegador (es torna a generar cada vegada).
+tests/browser/result.txt
+
+# Notes personals per a Claude: només en aquest ordinador.
+CLAUDE.local.md

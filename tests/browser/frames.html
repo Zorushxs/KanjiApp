@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="sample.js"></script>
+<style>body { margin: 0; display: flex; gap: 0; background: #888; } iframe { border: 0; flex: none; }</style>
+<script>
+  // Captures: obre /tests/browser/frames.html?w=390&h=844&theme=dark&lang=ca&r=#/&r=#/k/日&act=flip → un iframe per ruta, de mida exacta.
+  const q = new URLSearchParams(location.search), w = q.get('w') || 390, h = q.get('h') || 844;
+  localStorage.setItem('kanji:tema', q.get('theme') || 'light');
+  localStorage.setItem('kanji:idioma', q.get('lang') || 'ca');
+  // seed=1: carrega els kanji de sample.js (sense l'element amb errors) com a col·lecció.
+  if (q.get('seed')) {
+    const arr = JSON.parse(SAMPLE.slice(SAMPLE.indexOf('['), SAMPLE.lastIndexOf(']') + 1)).filter(k => k.kanji !== '金' && (!q.get('only') || q.get('only').includes(k.kanji)));
+    if (q.get('words')) arr.push(
+      { kanji: '学校', meanings: { ca: ['escola'], es: ['escuela'], en: ['school'] }, onyomi: [], kunyomi: [], reading: 'がっこう', jlpt: 5, emoji: '🏫',
+        mnemonic: { ca: 'On estudies (学) a l’edifici de fusta (校).', es: 'Donde estudias (学) en el edificio (校).', en: 'Where you study (学) in the building (校).' },
+        examples: [{ word: '学校に行く', reading: 'がっこうにいく', meaning: { ca: 'anar a l’escola', es: 'ir a la escuela', en: 'go to school' } }],
+        sentence: { jp: '学校はどこですか。', reading: 'がっこうはどこですか。', romaji: 'Gakkou wa doko desu ka.', meaning: { ca: 'On és l’escola?', es: '¿Dónde está la escuela?', en: 'Where is the school?' } } },
+      { kanji: 'じゃがいも', meanings: { ca: ['patata'], es: ['patata'], en: ['potato'] }, onyomi: [], kunyomi: [], reading: 'じゃがいも', jlpt: 4, emoji: '🥔' },
+      { kanji: '食べる', meanings: { ca: ['menjar'], es: ['comer'], en: ['to eat'] }, onyomi: [], kunyomi: [], reading: 'たべる', jlpt: 5, emoji: '🍽️' });
+    localStorage.setItem('kanji:dades', JSON.stringify({ version: 1, kanji: arr, progress: {}, history: {} }));
+  }
+  // two=1: 日 amb dues lectures principals (にち / ひ), triades per tu.
+  if (q.get('two')) {
+    const d = JSON.parse(localStorage.getItem('kanji:dades')), k = d.kanji.find(x => x.kanji === '日');
+    Object.assign(k, { reading: 'にち', reading2: 'ひ', mainByUser: true });
+    localStorage.setItem('kanji:dades', JSON.stringify(d));
+  }
+  // hist=1: historial d'exemple (dos mesos amb dies de tots els nivells) per veure el degradat del calendari.
+  if (q.get('hist')) {
+    const d = JSON.parse(localStorage.getItem('kanji:dades')), day = new Date(), pad = n => String(n).padStart(2, '0');
+    const counts = [0, 5, 12, 25, 45, 70, 0, 0, 15, 8, 30, 0, 62, 18, 3, 0, 41, 22, 11, 0, 9, 55, 27, 0, 14, 6, 0, 35, 19, 48, 12, 7, 0, 24, 16];
+    counts.forEach((n, i) => { const x = new Date(day); x.setDate(day.getDate() - i); if (n) d.history[`${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`] = n; });
+    localStorage.setItem('kanji:dades', JSON.stringify(d));
+  }
+  // prog=1: tots els kanji a la caixa 2 i pendents de repàs avui (per capturar una sessió normal).
+  if (q.get('prog')) {
+    const d = JSON.parse(localStorage.getItem('kanji:dades')), day = new Date(), pad = n => String(n).padStart(2, '0');
+    const today = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+    d.kanji.forEach(k => { d.progress[k.kanji] = { box: 2, due: today, seen: 3, fails: 1 }; });
+    localStorage.setItem('kanji:dades', JSON.stringify(d));
+  }
+  q.getAll('r').forEach(r => {
+    const f = document.createElement('iframe');
+    f.width = w; f.height = h; f.src = '../../index.html' + r;
+    document.write(f.outerHTML);
+  });
+  // Accions opcionals dins de l'iframe (per exemple, començar una sessió i girar la targeta).
+  const acts = q.getAll('act');
+  if (acts.length) window.addEventListener('DOMContentLoaded', () => setTimeout(async () => {
+    for (const fr of document.querySelectorAll('iframe')) {
+      const d = fr.contentDocument, sl = ms => new Promise(r => setTimeout(r, ms));
+      for (const a of acts) {
+        const el = a.startsWith('kin:') ? null : d.querySelector(a.startsWith('type:') ? a.split(':')[1] : a);
+        if (a.startsWith('kin:')) { const k = d.querySelector('.kin'); k.value = a.slice(4); k.dispatchEvent(new Event('input', { bubbles: true })); await sl(300); continue; }
+        if (a.startsWith('type:')) { el.value = window.SAMPLE; el.dispatchEvent(new Event('input', { bubbles: true })); }
+        else if (el) el.click();
+        await sl(500);
+      }
+    }
+  }, 1200));
+</script>
+<img src="/slow?ms=4500" alt="" style="position:absolute;width:1px;height:1px">

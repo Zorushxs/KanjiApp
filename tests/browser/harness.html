@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>harness</title></head>
+<body>
+<pre id="out"></pre>
+<iframe id="f" style="width:420px;height:900px"></iframe>
+<script src="sample.js"></script>
+<script>
+const out = document.getElementById('out'), f = document.getElementById('f');
+let fails = 0;
+const log = s => { out.textContent += s + '\n'; };
+const ok = (c, m) => { if (!c) fails++; log((c ? 'ok   ' : 'FAIL ') + m); };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const W = () => f.contentWindow, D = () => f.contentDocument, $ = s => D().querySelector(s), $$ = s => [...D().querySelectorAll(s)];
+async function until(fn, ms = 8000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { const v = fn(); if (v) return v; } catch {} await sleep(50); } return null; }
+const G = n => { try { return W().eval(n); } catch { return undefined; } };
+const go = async h => { W().location.hash = h; await sleep(120); };
+const type = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+
+(async () => {
+  try {
+    localStorage.clear();
+    f.src = '../../index.html#/'; await new Promise(r => { f.onload = r; });
+    await until(() => G('App') && $('#view .screen'));
+    await sleep(200);
+    ok(!!$('.empty h1') && /Encara no tens/.test($('.empty h1').textContent), 'inici buit: ' + ($('.empty h1') || {}).textContent);
+    ok($('#saveState').textContent.includes('navegador'), 'estat de desat: ' + $('#saveState').textContent);
+
+    await go('#/afegir');
+    type($('.kin'), 'Vull: 日月火 水人木金, i res més 日');
+    ok($$('.kchip').length === 7, 'detecta 7 kanji únics: ' + $$('.kchip').map(x => x.textContent).join(''));
+    ok($('.ptext').value.includes('these kanji: 日、月、火、水、人、木、金'), 'prompt amb els kanji');
+    type($('.paste'), SAMPLE);
+    await until(() => $('.result:not([hidden]) .grp'));
+    const groups = $$('.grp').map(g => g.className.replace('grp g-', '') + ':' + g.querySelectorAll('.rows > li').length).join(' ');
+    ok(groups === 'new:6 err:1', 'previsualització: ' + groups);
+    ok($('.result .note') && /Aquí tens les fitxes:.*Si vols, en puc fer més\./.test($('.result .note').textContent), 'nota de Claude (text de fora del bloc): ' + ($('.result .note') || {}).textContent);
+    ok($('.g-err .msgs .e').textContent.includes('katakana'), 'error de 金: ' + $('.g-err .msgs .e').textContent);
+    const warns = $$('.g-new .msgs .w').map(x => x.textContent);
+    ok(warns.some(w => /emoji/i.test(w)), 'avís emoji de 木');
+    ok(!$('.result img') && !$('.result svg[onload]') && !W().__xss, 'cap HTML injectat a la previsualització');
+    ok($('[data-act="apply"]').textContent.includes('6'), 'botó: ' + $('[data-act="apply"]').textContent);
+    $('[data-act="apply"]').click();
+    await sleep(100);
+    ok(G('Store').kanji.length === 6, 'desats 6 kanji');
+    ok($('.ok-line') && /6 nous/.test($('.ok-line').textContent), 'missatge: ' + ($('.ok-line') || {}).textContent);
+    await sleep(600);
+    const saved = JSON.parse(localStorage.getItem('kanji:dades') || 'null');
+    ok(saved && saved.version === 1 && saved.kanji.length === 6 && saved.progress && Object.keys(saved.progress).length === 0, 'desat a localStorage amb {version, kanji, progress}');
+
+    // Regenerar: tornar a enganxar la mateixa resposta → sense canvis
+    type($('.paste'), SAMPLE);
+    await until(() => $('.result:not([hidden]) .grp'));
+    ok($$('.grp').map(g => g.className.replace('grp g-', '')).join(' ') === 'same err', 'reenganxar → sense canvis');
+
+    // Els que ja tens no van al prompt; tocant-los s'hi afegeixen per regenerar-los
+    type($('.kin'), '日月 空');
+    ok($$('.kchip.has').length === 2 && $$('span.kchip').length === 1, 'xips: 2 ja existents en gris, 1 nou');
+    ok($('.ptext').value.split(String.fromCharCode(10))[0].endsWith('these kanji: 空.'), 'el prompt només porta 空');
+    $('.kchip.has').click();
+    ok($('.kchip.regen') && $('.ptext').value.includes('these kanji: 日、空'), 'tocar 日 → entra al prompt per regenerar');
+    $('.kchip.regen').click();
+    type($('.kin'), '日月');
+    ok($('.ptext').value === '' && /Ja tens tots/.test($('.picked').textContent), 'tots existents → prompt buit i avís');
+    type($('.kin'), '');
+
+    // "Que els triï Claude": prompt amb la llista, la quantitat, la temàtica i les paraules
+    Object.defineProperty(W().navigator.clipboard, 'writeText', { configurable: true, value: async s => { W().__copied = s; } });
+    W().__copied = undefined;
+    $('input[name="amode"][value="more"]').click(); await sleep(50);
+    ok(!$('.mode-more').hidden && $('.mode-own').hidden && $('.pview').hidden, 'mode «Claude tria els kanjis», sense previsualització');
+    ok(W().__copied === undefined, 'clicar el mode no copia res');
+    ok($$('.seg span').slice(0, 2).map(s => s.textContent).join(' | ') === 'Trio els kanjis | Claude tria els kanjis', 'noms: ' + $$('.seg span').slice(0, 2).map(s => s.textContent).join(' | '));
+    ok(/6 que ja tens/.test($('.mode-more .hint').textContent), 'avís: ' + $('.mode-more .hint').textContent.slice(0, 50));
+    ok($('.more-n').value === '' && $('.more-n').placeholder === '10', 'Quants: buit amb un 10 d’exemple');
+    type($('.more-n'), 'a1b2');
+    ok($('.more-n').type === 'text' && $('.more-n').inputMode === 'numeric' && $('.more-n').value === '12', 'Quants: sense fletxetes, teclat numèric i només xifres');
+    type($('.more-n'), '7'); type($('.more-theme'), 'menjar'); type($('.more-words'), 'gat, escola');
+    $('[data-act="copy"]').click(); await sleep(100);
+    const cp = W().__copied || '';
+    ok(cp.includes('The kanji I have already learned are: 日, 月, 火, 水, 人, 木') && cp.includes('I want to learn 7 new kanji:'), 'prompt: llista separada per comes i quantitat');
+    ok(cp.includes('about this theme: "menjar"') && cp.includes('In addition to those kanji, I want to learn these specific words: gat, escola') && !cp.includes('usual learning order'), 'prompt: 7 kanji de la temàtica i, a més, les paraules');
+    ok(cp.includes('patata → じゃがいも, not 芋') && cp.includes('Make a word card for each'), 'prompt: paraules tal com s’escriuen al Japó');
+    ok(cp.includes('"reading": "にち"') && cp.includes('"romaji": ""') && cp.includes('Hepburn'), 'prompt: format amb lectura principal i rōmaji de la frase');
+    type($('.more-theme'), ''); type($('.more-words'), ''); $('[data-act="copy"]').click(); await sleep(100);
+    ok((W().__copied || '').includes('usual learning order (JLPT N5 first'), 'sense temàtica ni paraules: els més útils');
+    const arr = JSON.parse(SAMPLE.slice(SAMPLE.indexOf('['), SAMPLE.lastIndexOf(']') + 1));
+    const yama = { kanji: '山', meanings: { ca: ['muntanya'], es: ['montaña'], en: ['mountain'] }, onyomi: ['サン'], kunyomi: ['やま'], reading: 'やま', strokes: 3, jlpt: 5 };
+    type($('.paste'), '```json' + JSON.stringify([yama, arr[1]]) + '```');
+    await until(() => $$('.result .rows > li').length === 2, 4000);
+    ok($$('.grp').map(g => g.className.replace('grp g-', '') + ':' + g.querySelectorAll('.rows > li').length).join(' ') === 'new:1 have:1', 'resposta: 1 nou i 1 que ja tenies');
+    ok(/Desar 1 kanji/.test($('[data-act="apply"]').textContent), 'només es desa el nou');
+    ok($('.g-new .rm').textContent.includes('やま') && $('.g-new .rm .ro').textContent === 'yama', 'previsualització amb lectura principal i rōmaji');
+    $('[data-act="apply"]').click(); await sleep(100);
+    ok(G('Store').kanji.length === 7 && G('Store').get('月').meanings.ca[0] === 'lluna', '山 afegit i 月 intacte');
+    G('Store').remove('山');
+    $('input[name="amode"][value="own"]').click(); await sleep(50);
+    ok(!$('.mode-own').hidden && !$('.pview').hidden, 'tornar a «Els escric jo»');
+    await go('#/');
+    ok($$('.tile').length === 6, 'graella amb 6 fitxes');
+    ok($('.stat b').textContent === '0' && $$('.stat b')[1].textContent === '6', 'stats: 0 per repassar, 6 nous');
+    type($('.search'), 'lluna'); ok($$('.tile').length === 1 && $('.tile-k').textContent === '月', 'cerca "lluna" → 月');
+    type($('.search'), 'にち'); ok($$('.tile').length === 1 && $('.tile-k').textContent === '日', 'cerca "にち" (hiragana) troba ニチ → 日');
+    type($('.search'), 'ひと'); ok($$('.tile').map(x => x.querySelector('.tile-k').textContent).join('') === '人', 'cerca "ひと" → 人');
+    type($('.search'), 'tsuki'); ok($$('.tile').map(x => x.querySelector('.tile-k').textContent).join('') === '月', 'cerca en rōmaji "tsuki" → 月');
+    type($('.search'), 'mizu'); ok($$('.tile').map(x => x.querySelector('.tile-k').textContent).join('') === '水', 'cerca en rōmaji "mizu" → 水');
+    type($('.search'), '');
+    $$('.chip').find(c => c.textContent === 'N4').click();
+    ok($$('.tile').length === 1 && $('.tile-k').textContent === '木', 'filtre N4 → 木');
+    $$('.chip').find(c => c.dataset.lv === 'all').click();
+    ok(!W().__xss && !$('.tile img'), 'graella sense injecció');
+
+    // Fitxa
+    $$('.tile')[0].click();
+    await until(() => $('.hero-k'));
+    ok($('.hero-k').textContent === '日' && $('.means').textContent === 'sol · dia', 'fitxa 日: ' + $('.means').textContent);
+    ok($$('.rd-v')[0].textContent === 'ニチ、ジツ', 'on: ' + $$('.rd-v')[0].textContent);
+    ok($$('.rd .say').length === 2 && $('.hero > .say').dataset.say === 'にち', 'la veu de dalt diu la lectura principal: ' + $('.hero > .say').dataset.say);
+    ok(/にち/.test($('.main-r').textContent) && $('.main-r .ro').textContent === 'nichi', 'lectura principal: ' + $('.main-r').textContent.trim().replace(/\s+/g, ' '));
+    ok($('.is-main') && $('.is-main').textContent === 'ニチ', 'la lectura principal es destaca a la llista');
+    ok($$('.rd-ro').map(x => x.textContent).join(' | ') === 'nichi, jitsu | hi, -bi, -ka', 'rōmaji de les lectures: ' + $$('.rd-ro').map(x => x.textContent).join(' | '));
+    ok($$('.ex-r .ro').map(x => x.textContent).join(',') === 'nihon,mainichi,nichiyoubi', 'rōmaji dels exemples: ' + $$('.ex-r .ro').map(x => x.textContent).join(','));
+    ok($('.sent-ro').textContent === 'Mainichi nihongo o benkyou shimasu.', 'rōmaji de la frase (de Claude)');
+    ok($$('.ex li').length === 3 && $('.ex mark').textContent === '日', 'exemples amb el kanji ressaltat');
+    ok($$('details.fold').length === 2 && !$('details.fold').open, 'origen i curiositat plegats');
+    ok($('a[href*="jisho.org"]').href.includes('%E6%97%A5%20%23kanji'), 'enllaç a Jisho');
+    const so = await until(() => $$('.so-ink path').length, 15000);
+    ok(so === 4, 'KanjiVG: ' + so + ' traços dibuixats');
+    ok($$('.so-num text').length === 4, 'números de traç');
+    // ---- Veu: consola i alternatives ----
+    const C = W().console, logs = [], NL7 = String.fromCharCode(10) + '       ';
+    ['info', 'warn', 'error'].forEach(k => { const f = C[k].bind(C); C[k] = (...x) => { logs.push(k + ': ' + x.join(' ')); f(...x); }; });
+    const table = C.table.bind(C); let tabled = 0; C.table = x => { tabled = x.length; table(x); };
+    const V = G('Veu'), ss = W().speechSynthesis, realVoices = ss.getVoices.bind(ss), realSpeak = ss.speak.bind(ss), RealAudio = W().Audio;
+    const hasJa = ss.getVoices().some(v => /^ja/i.test(v.lang));
+    const run = async (label, fn) => { logs.length = 0; const r = await fn().then(x => x, e => 'ERR ' + e.message); log('     ' + label + ' → ' + r + NL7 + logs.join(NL7)); return r; };
+    // 1. Amb veu japonesa al navegador
+    let r = await run('amb veu japonesa', () => V.say('にち'));
+    ok(!hasJa || (r === 'device' && logs.some(l => /veus, \d+ en japonès/.test(l)) && logs.some(l => /veu del navegador:/.test(l)) && logs.some(l => /Sona ✓/.test(l))), (hasJa ? '' : '(sense veu japonesa al navegador, omès) ') + 'consola: veu del navegador i «Sona ✓»');
+    // 2. Sense veu japonesa (com Opera)
+    ss.getVoices = () => realVoices().filter(v => !/^ja/i.test(v.lang)); ss.onvoiceschanged();
+    r = await run('sense veu japonesa', () => V.say('ひ'));
+    ok(r === 'online' && logs.some(l => /veu en línia de Google/.test(l)) && logs.some(l => /Sona ✓/.test(l)), 'consola: veu en línia i «Sona ✓»');
+    // 3. La veu del navegador falla → prova la en línia
+    ss.getVoices = realVoices; ss.onvoiceschanged();
+    ss.speak = u => setTimeout(() => u.onerror({ error: 'synthesis-failed' }), 20);
+    r = await run('veu del navegador que falla', () => V.say('つき'));
+    ok(!hasJa || (r === 'online' && logs.some(l => /^warn: .*no ha funcionat: error «synthesis-failed».*Provo la veu en línia/.test(l))), (hasJa ? '' : '(sense veu japonesa al navegador, omès) ') + 'consola: avís de fallada i passa a la veu en línia');
+    // 4. Tampoc funciona la veu en línia → error a la consola i avís a la pantalla
+    W().Audio = function () { return new RealAudio('https://translate.google.com/no-existeix'); };
+    logs.length = 0; $('#toast').hidden = true;
+    $('.rd .say').click(); await until(() => !$('#toast').hidden && logs.some(l => /No sona/.test(l)), 10000);
+    ok(logs.some(l => /^error: .*No sona: Google no ha tornat àudio/.test(l)) && logs.some(l => /Prova aquesta adreça/.test(l)), 'consola: error amb motiu i adreça per provar');
+    ok(/Detalls a la consola \(F12\)/.test($('#toast').textContent), 'avís a la pantalla: ' + $('#toast').textContent.slice(0, 60) + '…');
+    log('       ' + logs.join(NL7));
+    ss.speak = realSpeak; W().Audio = RealAudio;
+    // 5. Veu.diagnose()
+    r = await run('Veu.diagnose()', () => V.diagnose());
+    ok(tabled > 0 && (!hasJa || logs.some(l => /Veu triada:/.test(l))), 'Veu.diagnose(): taula de ' + tabled + ' veus');
+    ok(D().querySelector('meta[name="referrer"]').content === 'same-origin', 'meta referrer same-origin');
+    ok(!$('.so-warn'), 'sense avís de traços (4 = 4)');
+    const vb = () => $('[data-act="verify"]'), vp = () => $('[data-ver-pill]');
+    ok(vb().classList.contains('ver-pending') && /Per verificar/.test(vb().textContent) && vp().hidden, 'botó: per verificar (sense pastilla)');
+    vb().click();
+    ok(G('Store').get('日').verified === true && vb().classList.contains('ver-ok') && /Verificat/.test(vb().textContent) && !vp().hidden, 'botó: verificat');
+    vb().click();
+    ok(G('Store').get('日').verified === 'error' && vb().classList.contains('ver-err') && /Té errors/.test(vp().textContent), 'botó: té errors');
+    vb().click();
+    ok(G('Store').get('日').verified === false && vp().hidden, 'botó: torna a per verificar');
+    vb().click();
+    ok(!$('input[type="checkbox"]'), 'ja no hi ha checkbox');
+    ok($('.pos').textContent.trim() === '1 / 6', 'posició 1 / 6');
+    key('ArrowRight'); await sleep(150);
+    ok($('.hero-k').textContent === '月', 'fletxa → 月');
+
+    // Lliscar amb el dit: es simula una pantalla tàctil (pointer: coarse) i gestos de touch
+    const realMM = W().matchMedia.bind(W());
+    W().matchMedia = q => (/pointer: coarse/.test(q) ? { matches: true, media: q } : realMM(q));
+    const touch = (type, x, y) => {
+      const ev = new (W().Event)(type, { bubbles: true });
+      Object.defineProperty(ev, 'touches', { value: type === 'touchend' ? [] : [{ clientX: x, clientY: y }] });
+      $('.sheet').dispatchEvent(ev);
+    };
+    const swipeGo = async (x0, x1, y1 = 400) => { touch('touchstart', x0, 400); touch('touchmove', (x0 + x1) / 2, (400 + y1) / 2); touch('touchmove', x1, y1); touch('touchend'); await sleep(320); };
+    await go('#/k/' + encodeURIComponent('日')); await go('#/k/' + encodeURIComponent('月')); // es torna a pintar amb la pantalla tàctil
+    await swipeGo(300, 120);
+    ok($('.hero-k').textContent === '火' && $('.sheet').classList.contains('enter-right'), 'lliscar cap a l’esquerra → fitxa següent (火), entra per la dreta');
+    await swipeGo(120, 300);
+    ok($('.hero-k').textContent === '月' && $('.sheet').classList.contains('enter-left'), 'lliscar cap a la dreta → fitxa anterior (月), entra per l’esquerra');
+    await swipeGo(300, 270);
+    ok($('.hero-k').textContent === '月' && $('.sheet').style.transform === '', 'lliscada curta: no canvia i torna al seu lloc');
+    await swipeGo(300, 200, 600);
+    ok($('.hero-k').textContent === '月', 'gest més vertical que horitzontal: no canvia (es desplaça la pàgina)');
+    await swipeGo(10, 300);
+    ok($('.hero-k').textContent === '月', 'des de la vora de la pantalla (gest d’enrere): no canvia');
+    await go('#/k/' + encodeURIComponent('日'));
+    await swipeGo(120, 300);
+    ok($('.hero-k').textContent === '日', 'a la primera fitxa, cap a la dreta: no n’hi ha cap d’anterior');
+    W().matchMedia = realMM;
+    await go('#/k/' + encodeURIComponent('月'));
+    await swipeGo(300, 120);
+    ok($('.hero-k').textContent === '月', 'sense pantalla tàctil (ordinador): lliscar no fa res');
+    await go('#/k/' + encodeURIComponent('木'));
+    ok(!W().__xss && !$('.sheet img') && !$('.sheet script') && !$('.emoji'), 'fitxa de 木 sense injecció ni emoji');
+    ok($('.means').textContent.includes('<img'), 'el text hostil es veu com a text');
+    const warn = await until(() => $('.so-warn'), 15000);
+    ok(warn && /5.*4/.test(warn.textContent), 'avís traços: ' + (warn || {}).textContent);
+    await go('#/k/' + encodeURIComponent('猫'));
+    ok(/no és a la teva/.test($('.empty p').textContent), 'kanji inexistent → avís');
+
+    // Desplegables oberts en canviar d'idioma
+    await go('#/k/' + encodeURIComponent('日'));
+    const fold = f => $(`details[data-fold="${f}"]`);
+    fold('trivia').open = true;
+    $('[data-lang="es"]').click(); await sleep(100);
+    ok(fold('trivia').open && !fold('origin').open && $('.fold summary').textContent === 'Origen', 'canvi a ES: curiositat oberta, origen tancat');
+    fold('origin').open = true;
+    $('[data-lang="en"]').click(); await sleep(100);
+    ok(fold('trivia').open && fold('origin').open && /Trivia/.test(fold('trivia').textContent), 'canvi a EN: tots dos oberts');
+    $('[data-lang="ca"]').click(); await sleep(100);
+    ok(fold('trivia').open && fold('origin').open, 'canvi a CA: continuen oberts');
+    key('ArrowRight'); await sleep(150);
+    ok($$('details[data-fold][open]').length === 0, 'altre kanji: desplegables tancats');
+    await go('#/afegir'); $('.pview').open = true;
+    $('[data-lang="es"]').click(); await sleep(100);
+    ok($('.pview').open && /Ver el prompt/.test($('.pview summary').textContent), 'Afegir: «Veure el prompt» obert en canviar d’idioma');
+    $('[data-lang="ca"]').click(); await sleep(100);
+    // Idioma
+    $('[data-lang="en"]').click(); await sleep(100);
+    ok($('[data-nav="home"] span').textContent === 'Home' && D().documentElement.lang === 'en', 'canvi a anglès');
+    await go('#/k/' + encodeURIComponent('日'));
+    ok($('.means').textContent === 'sun · day' && $('.mnemo p').textContent.startsWith('A square'), 'contingut en anglès');
+    ok($$('#langs button').map(b => b.textContent).join(' ') === 'CA ES EN', 'selector: CA ES EN');
+    $('[data-lang="es"]').click(); await sleep(100);
+    ok($('[data-nav="add"] span').textContent === 'Añadir' && $('.means').textContent === 'sol · dia', 'castellà (sense contingut es → fa servir el català)');
+    await go('#/afegir/' + encodeURIComponent('日'));
+    ok($('.kchip.regen') && $('.ptext').value.includes('these kanji: 日') && $('.ptext').value.includes('Spanish ("es")'), 'Regenerar des de la fitxa: 日 ja inclòs al prompt');
+    $('[data-lang="ca"]').click(); await sleep(100);
+    ok(localStorage.getItem('kanji:idioma') === 'ca', 'idioma recordat');
+
+    // Pràctica
+    await go('#/practica');
+    ok(/0 per repassar · 6 nous/.test($('.big-line').textContent), 'preparació: ' + $('.big-line').textContent);
+    ok($$('.bx div').length === 6 && $('.bx .b0 b').textContent === '6', 'caixes: 6 nous');
+    $('input[name="size"][value="10"]').click(); await sleep(50);
+    ok($('[data-act="start"]').textContent.includes('6'), 'botó: ' + $('[data-act="start"]').textContent);
+    $('[data-act="start"]').click();
+    await until(() => $('.flash'));
+    ok(/1\/6/.test($('.ses-top .pos').textContent), 'sessió 1/6');
+    ok(!$('.rev') && $('.flash .big-k'), 'anvers: kanji, sense resposta');
+    const ab = $('.answer').getBoundingClientRect(), fb = $('.answer > .btn.big').getBoundingClientRect();
+    ok(Math.abs((ab.left + ab.right) / 2 - (fb.left + fb.right) / 2) < 2, 'Girar centrat sota la targeta');
+    key(' '); await until(() => $('.grade'));
+    ok($('.rev .ans-m') && $$('.grade .btn').length === 3, 'girada: resposta i 3 botons');
+    const kf = G('Store').get($('.flash .big-k').textContent);
+    ok(!!$('.rev .ans-main') === !!kf.reading && $$('.rev .reads .ro').length > 0, 'revers: lectura principal ' + (kf.reading ? 'present' : 'absent (fitxa sense)') + ' i rōmaji de les lectures');
+    ok($$('.grade .btn').map(b => b.dataset.g).join(',') === 'no,yes,doubt', 'ordre: No · Sí · Dubte');
+    ok($('.grade .yes small').textContent === '3 dies' && $('.grade .no small').textContent === 'demà', 'intervals: ' + $$('.grade small').map(x => x.textContent).join(' / '));
+    const first = $('.flash .big-k').textContent;
+    $('.grade .no').click(); await sleep(50);                     // falla el primer
+    for (let i = 0; i < 5; i++) { key(' '); await until(() => $('.grade')); key('2'); await sleep(30); } // encerta la resta (tecla 2 = Sí)
+    ok(/7\/7/.test($('.ses-top .pos').textContent) && $('.again'), 'la fallada torna al final: ' + $('.ses-top .pos').textContent);
+    ok($('.flash .big-k').textContent === first, 'és el mateix kanji ' + first);
+    key(' '); await until(() => $('.grade'));
+    ok(!$('.grade small'), 'la repetició no mostra intervals');
+    key('2'); await until(() => $('.summary'));
+    ok($$('.res b').map(b => b.textContent).join(',') === '1,5,0', 'resum no,sí,dubte = ' + $$('.res b').map(b => b.textContent).join(','));
+    ok($$('.summary .tile').length === 1, 'llista de fallats');
+    const P = G('Store');
+    ok(P.prog(first).box === 1 && P.prog(first).fails === 1 && P.prog(first).seen === 1, 'fallat → caixa 1, 1 error, vist 1 (la repetició no compta)');
+    ok(P.kanji.filter(k => k.kanji !== first).every(k => P.prog(k.kanji).box === 2), 'encertats → caixa 2');
+    await sleep(600);
+    ok(Object.keys(JSON.parse(localStorage.getItem('kanji:dades')).progress).length === 6, 'progrés desat al JSON');
+
+    await go('#/practica');
+    ok(/Tot al dia/.test($('.setup .big-line').textContent) && $('[data-act="free"]'), 'res pendent → repàs lliure');
+    $('input[value="m2k"]').click(); await sleep(30);
+    $('[data-act="free"]').click(); await until(() => $('.flash'));
+    ok($('.flash .big-m') && $('.tag'), 'repàs lliure en mode significat → kanji');
+    const before = JSON.stringify(P.snapshot().progress);
+    key(' '); await until(() => $('.grade')); key('1'); await sleep(50);
+    key(' '); await until(() => $('.grade')); key('3'); await sleep(50);
+    ok(JSON.stringify(P.snapshot().progress) === before, 'repàs lliure no canvia caixes');
+    ok(Object.values(JSON.parse(localStorage.getItem('kanji:dades')).progress).every(p => p.box <= 2), 'caixes intactes');
+    $('[data-act="quit"]').click(); await sleep(150);
+    ok(W().location.hash === '#/practica', 'sortir torna a la preparació: ' + W().location.hash);
+
+    // Interruptor global: tornar a practicar els d'avui
+    $('input[value="k2m"]').click(); await sleep(30);
+    ok($('.switch').getAttribute('aria-checked') === 'false' && !/d’avui/.test($('.panel .big-line').textContent), 'interruptor apagat per defecte');
+    $('.switch').click(); await sleep(50);
+    ok($('.switch').getAttribute('aria-checked') === 'true' && /6 d’avui/.test($('.panel .big-line').textContent), 'encès: ' + $('.panel .big-line').textContent);
+    ok(JSON.parse(localStorage.getItem('kanji:practica')).again === true, 'l’interruptor es recorda');
+    ok($('[data-act="start"]') && /\(6\)/.test($('[data-act="start"]').textContent), 'es poden tornar a practicar els 6: ' + $('[data-act="start"]').textContent);
+    $('[data-act="start"]').click(); await until(() => $('.flash'));
+    let ch1 = $('.flash .big-k').textContent, p1 = JSON.stringify(P.prog(ch1));
+    key(' '); await until(() => $('.grade'));
+    const hints = $$('.grade small').map(x => x.textContent).join(' / ');
+    ok(hints === 'demà / no canvia / no canvia', 'repàs extra: ' + hints);
+    key('2'); await sleep(50);
+    const q1 = P.prog(ch1);
+    ok(q1.box === JSON.parse(p1).box && q1.due === JSON.parse(p1).due && q1.seen === JSON.parse(p1).seen + 1, 'encert el mateix dia: no puja de caixa ni canvia la data');
+    const ch2 = $('.flash .big-k').textContent;
+    key(' '); await until(() => $('.grade')); key('1'); await sleep(50);
+    ok(P.prog(ch2).box === 1 && P.prog(ch2).due === G('U').addDays(1), 'error el mateix dia: torna a la caixa 1, demà');
+    $('[data-act="quit"]').click(); await sleep(150);
+    $('.switch').click(); await sleep(50);
+    ok($('.switch').getAttribute('aria-checked') === 'false', 'interruptor apagat de nou');
+
+    // Calendari
+    ok($$('.nav a').length === 4 && $$('.nav a')[2].textContent.trim() === 'Calendari', 'pestanya Calendari');
+    await go('#/calendari');
+    const hist = P.history[G('U').today()];
+    ok(hist === 11, 'respostes d’avui comptades: ' + hist);
+    const td = $('.day.is-today');
+    ok(td && td.classList.contains('l2') && td.textContent.includes('11'), 'avui pintat amb el nivell 2 i «11»');
+    ok(/11 targetes respostes/.test(td.querySelector('.sr').textContent), 'text per a lectors de pantalla: ' + td.querySelector('.sr').textContent);
+    ok(/targetes respostes aquest mes/.test($('.cal-stats').textContent) && /Cada vegada que respons una targeta/.test($('.cal .hint').textContent), 'explica què es compta');
+    f.style.width = '900px'; await sleep(150);
+    const tdc = $('.day.is-today'), rb = tdc.querySelector('b').getBoundingClientRect(), rc = tdc.getBoundingClientRect();
+    ok(Math.abs((rb.left + rb.right) / 2 - (rc.left + rc.right) / 2) < 2 && rb.width < rc.width, 'a 900 px, el número d’avui és centrat');
+    f.style.width = '420px'; await sleep(100);
+    ok($$('.cal-stats .stat b').map(b => b.textContent).join(',') === '1,11,1', 'dies, respostes, ratxa: ' + $$('.cal-stats .stat b').map(b => b.textContent).join(','));
+    ok($$('.cal-legend li').map(l => l.textContent).join(' ') === '0 1–9 10–19 20–39 40–59 60+' && $('[data-cal="next"]').disabled, 'llegenda amb rangs: ' + $$('.cal-legend li').map(l => l.textContent).join(' '));
+    const t0 = $('.cal-title').textContent;
+    $('[data-cal="prev"]').click(); await sleep(50);
+    ok($('.cal-title').textContent !== t0 && $('[data-cal="today"]') && !$('.day.is-today'), 'mes anterior: ' + $('.cal-title').textContent);
+    $('[data-cal="today"]').click(); await sleep(50);
+    ok($('.cal-title').textContent === t0, 'tornar a avui');
+    key('ArrowLeft'); await sleep(50); ok($('.cal-title').textContent !== t0, 'fletxa ← canvia de mes');
+    key('ArrowRight'); await sleep(50); ok($('.cal-title').textContent === t0, 'fletxa → torna');
+    $('[data-lang="es"]').click(); await sleep(100);
+    ok(/tarjetas respondidas este mes/.test($('.cal-stats').textContent) && /Tarjetas respondidas al día/.test($('.cal-legend').textContent), 'calendari en castellà');
+    $('[data-lang="ca"]').click(); await sleep(100);
+
+    await go('#/');
+    ok($('.stat b').textContent === '0' && $('.tile.due') === null, 'inici: res per repassar avui');
+    ok(!W().__xss, 'cap script injectat en tota la prova');
+
+    // ---- Paraules: 「」 a «Trio els kanjis», fitxes de paraula, filtres i interruptors ----
+    await go('#/afegir');
+    $('input[name="amode"][value="own"]').click(); await sleep(30);
+    type($('.kin'), '「学校」 学 「じゃがいも」');
+    ok($$('.kchip').map(c => c.textContent).join(' ') === '学校 学 じゃがいも', 'xips amb paraules entre 「」: ' + $$('.kchip').map(c => c.textContent).join(' '));
+    ok($('.ptext').value.includes('Create study cards for these kanji: 学, and these words: 学校、じゃがいも.'), 'prompt de fitxes amb kanji i paraules');
+    const gakkou = { kanji: '学校', meanings: { ca: ['escola'], es: ['escuela'], en: ['school'] }, onyomi: [], kunyomi: [], reading: 'がっこう', strokes: null, jlpt: 5,
+      examples: [{ word: '学校に行く', reading: 'がっこうにいく', meaning: { ca: 'anar a l’escola', es: 'ir a la escuela', en: 'go to school' } }],
+      sentence: { jp: '学校はどこですか。', reading: 'がっこうはどこですか。', romaji: 'Gakkou wa doko desu ka.', meaning: { ca: 'On és l’escola?', es: '¿Dónde está la escuela?', en: 'Where is the school?' } } };
+    const gaku = { kanji: '学', meanings: { ca: ['estudiar'], es: ['estudiar'], en: ['study'] }, onyomi: ['ガク'], kunyomi: ['まな.ぶ'], reading: 'がく', strokes: 8, jlpt: 5 };
+    const jaga = { kanji: 'じゃがいも', meanings: { ca: ['patata'], es: ['patata'], en: ['potato'] }, onyomi: [], kunyomi: [], reading: 'じゃがいも', strokes: null, jlpt: 4 };
+    type($('.paste'), '```json' + JSON.stringify([gakkou, gaku, jaga]) + '```');
+    await until(() => $$('.result .g-new .rows > li').length === 3, 4000);
+    ok($$('.result .g-new .rows > li').length === 3 && !$('.result .g-err'), 'resposta: 3 fitxes noves (2 paraules i 1 kanji)');
+    $('[data-act="apply"]').click(); await sleep(100);
+    ok(G('Store').kanji.length === 9, 'col·lecció: 9 fitxes');
+
+    await go('#/');
+    ok($$('.chips [data-kind]').length === 2, 'filtre Kanji / Paraules');
+    $('[data-kind="word"]').click(); await sleep(30);
+    ok($$('.tile .tile-k').map(x => x.textContent).join(' ') === '学校 じゃがいも', 'només paraules: ' + $$('.tile .tile-k').map(x => x.textContent).join(' '));
+    ok($$('.tile .tile-k')[0].classList.contains('w2') && $$('.tile .tile-k')[1].classList.contains('w4'), 'mida de lletra segons la llargada');
+    $('[data-kind="kanji"]').click(); await sleep(30);
+    ok($$('.tile').length === 9, 'Kanji i Paraules encesos → tots');
+    $('[data-kind="word"]').click(); await sleep(30);
+    ok($$('.tile').length === 7 && !$$('.tile .tile-k').some(x => x.textContent === '学校'), 'només kanji: 7');
+    $('[data-kind="kanji"]').click(); await sleep(30);
+    ok($$('.tile').length === 9, 'cap encès → tots');
+    // Interruptors: significats a la graella i rōmaji a tot arreu
+    const swM = $('[data-pref="meanings"]'), swR = $('[data-pref="romaji"]');
+    ok(swM.getAttribute('aria-checked') === 'true' && swR.getAttribute('aria-checked') === 'true', 'interruptors encesos per defecte');
+    const sizes = () => $$('.tile').map(x => { const r = x.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }).join(' ');
+    const sizesBefore = sizes();
+    swM.click(); await sleep(30);
+    ok($('.grid').classList.contains('hide-m') && W().getComputedStyle($('.tile-m')).visibility === 'hidden', 'amagar significats a la graella');
+    ok(sizes() === sizesBefore, 'les targetes mantenen la mida sense significats: ' + sizes().split(' ')[0]);
+    swR.click(); await sleep(30);
+    ok(D().documentElement.dataset.romaji === 'off', 'rōmaji apagat');
+    await go('#/k/' + encodeURIComponent('日'));
+    ok($('.ro') && W().getComputedStyle($('.ro')).display === 'none', 'a la fitxa, el rōmaji no es veu');
+    ok($$('.rd-ro').length === 2 && $$('.rd-ro').every(x => W().getComputedStyle(x).display === 'none'), 'ni els blocs de lectures (sense comes soltes)');
+    await go('#/');
+    ok($('.grid').classList.contains('hide-m') && JSON.parse(localStorage.getItem('kanji:vista')).meanings === false, 'es recorden');
+    $('[data-pref="meanings"]').click(); $('[data-pref="romaji"]').click(); await sleep(30);
+    ok(!$('.grid').classList.contains('hide-m') && D().documentElement.dataset.romaji === 'on', 'tornar-los a encendre');
+
+    // Fitxa de paraula
+    await go('#/k/' + encodeURIComponent('学校'));
+    ok($('.hero-k').classList.contains('w2') && !$('.so') && /Paraula/.test($('.facts').textContent), 'fitxa de paraula: sense ordre de traços, amb l’etiqueta Paraula');
+    ok($('.main-r small').textContent === 'Es llegeix' && $('.main-r .ro').textContent === 'gakkou', 'lectura de la paraula: がっこう gakkou');
+    ok($$('.kpart').map(x => x.querySelector('span').textContent).join('') === '学校' && $('a.kpart') && $('.kpart.off'), 'kanji de la paraula: 学 enllaçat, 校 encara no');
+    ok($('a[href*="jisho.org"]').href.endsWith(encodeURIComponent('学校')) && $('a[href^="#/afegir/"]').getAttribute('href') === '#/afegir/' + encodeURIComponent('「学校」'), 'Jisho busca la paraula i Regenerar porta 「学校」');
+    // Botó «Rōmaji» a dalt de la fitxa, sincronitzat amb l'interruptor de l'inici
+    const romBtn = () => $('.bar [data-romaji-toggle]');
+    ok(romBtn() && romBtn().getAttribute('aria-pressed') === 'true' && W().getComputedStyle($('.main-r .ro')).display !== 'none', 'botó Rōmaji a la fitxa, premut');
+    romBtn().click(); await sleep(30);
+    ok(romBtn().getAttribute('aria-pressed') === 'false' && W().getComputedStyle($('.main-r .ro')).display === 'none', 'Rōmaji des de la fitxa: s’amaga');
+    await go('#/');
+    ok($('[data-pref="romaji"]').getAttribute('aria-checked') === 'false', 'l’interruptor de l’inici també és apagat');
+    $('[data-pref="romaji"]').click(); await sleep(30);
+    await go('#/k/' + encodeURIComponent('学校'));
+    ok(romBtn().getAttribute('aria-pressed') === 'true', 'i tornat a encendre des de l’inici');
+    await go('#/k/' + encodeURIComponent('じゃがいも'));
+    ok(/només amb kana/.test($('.panel .hint').textContent), 'paraula només en kana: ho diu');
+
+    // Pràctica amb paraules
+    await go('#/practica');
+    ok($('input[name="kind"][value="word"]') && /significat\/lectura/.test($$('.seg span').map(s => s.textContent).join('|')), 'filtre de tipus i mode «Kanji → significat/lectura»');
+    $('input[name="kind"][value="word"]').click(); await sleep(30);
+    ok(/Començar \(2\)/.test($('[data-act="start"]').textContent), 'només paraules: 2');
+    ok(!$('input[name="mode"][value="read"]') && $$('input[name="mode"]').length === 2, 'sense el mode Lectura');
+    $('[data-act="start"]').click(); await until(() => $('.flash'));
+    const wk = $('.flash .big-k').textContent, wexp = { '学校': ['w2', 'がっこう'], 'じゃがいも': ['w4', 'じゃがいも'] }[wk];
+    ok(wexp && $('.flash .big-k').classList.contains(wexp[0]), 'targeta de paraula: ' + wk);
+    const pb = () => $('.ses-tags [data-romaji-toggle]');
+    ok(pb() && pb().getAttribute('aria-pressed') === 'true', 'botó Rōmaji a la pràctica, premut');
+    const pr = pb().getBoundingClientRect(), qr = $('.ses-top .pos').getBoundingClientRect();
+    ok(Math.abs(pr.right - qr.right) < 2 && pr.top > qr.bottom, 'el botó Rōmaji és a la dreta, just sota del «1/2»');
+    key(' '); await until(() => $('.grade'));
+    ok($('.rev .ans-main') && $('.rev .ans-main').textContent.includes(wexp[1]) && !$('.rev .reads'), 'revers: la lectura de la paraula');
+    pb().click(); await sleep(30);
+    ok(pb().getAttribute('aria-pressed') === 'false' && D().documentElement.dataset.romaji === 'off' && W().getComputedStyle($('.rev .ro')).display === 'none', 'Rōmaji des de la pràctica: s’amaga');
+    pb().click(); await sleep(30);
+    ok(D().documentElement.dataset.romaji === 'on' && W().getComputedStyle($('.rev .ro')).display !== 'none', 'i torna a sortir');
+    $('[data-act="quit"]').click(); await sleep(150);
+    $('input[name="kind"][value="all"]').click(); await sleep(30);
+
+    // Molts kanji a «Trio els kanjis» i resposta tallada: s'aprofiten les fitxes senceres
+    await go('#/afegir');
+    $('input[name="amode"][value="own"]').click(); await sleep(30);
+    const many = '一二三四五六七八九十百千万円口', manyArr = [...many];
+    type($('.kin'), many);
+    ok($$('.kchip').length === 15 && !$('.picked .warn') && !/10 o menys/.test($('.mode-own .hint').textContent), '15 kanji: cap avís de límit');
+    ok($('.ptext').value.includes('these kanji: ' + manyArr.join('、') + '.'), 'els 15 van al prompt');
+    const card = c => ({ kanji: c, meanings: { ca: ['x'], es: ['x'], en: ['x'] }, onyomi: ['イチ'], kunyomi: [], reading: 'いち', strokes: 1, jlpt: 5 });
+    const fullResp = JSON.stringify(manyArr.slice(0, 4).map(card), null, 2);
+    type($('.paste'), 'Aquí tens:' + String.fromCharCode(10) + '```json' + String.fromCharCode(10) + fullResp.slice(0, fullResp.lastIndexOf('"四"') + 20));
+    await until(() => $('.result .missing'), 4000);
+    ok(/no ha arribat sencera/.test($('.result').textContent) && /3 fitxes completes/.test($('.result').textContent), 'avís de resposta tallada: 3 fitxes aprofitades');
+    ok($$('.result .g-new .rows > li').length === 3 && /Desar 3 kanji/.test($('[data-act="apply"]').textContent), 'es poden desar les 3 senceres');
+    W().__copied = undefined;
+    $('[data-act="copy-missing"]').click(); await sleep(100);
+    ok((W().__copied || '').includes('these kanji: ' + manyArr.slice(3).join('、') + '.'), 'botó: copia el prompt dels 12 que falten');
+    type($('.paste'), ''); type($('.kin'), '');
+
+    // ---- Editar la fitxa i triar la lectura principal ----
+    await go('#/k/' + encodeURIComponent('日'));
+    const S = G('Store'), prog日 = JSON.stringify(S.prog('日'));
+    ok($('[data-act="edit"]') && !$('.sheet.editing'), 'botó «Editar» a la fitxa');
+    $('[data-act="edit"]').click(); await sleep(60);
+    ok($('.sheet.editing') && $('.edit-bar') && $('[data-e="meanings"]').value === 'sol, dia', 'mode edició: els camps porten el text actual');
+    const mc = v => $(`[data-main-v="${v}"]`), pressed = () => $$('[data-main-v][aria-pressed="true"]').map(b => b.dataset.mainV + ((b.querySelector('b') || {}).textContent || '')).join(',');
+    ok($$('[data-main-v]').map(b => b.dataset.mainV).join(',') === 'にち,じつ,ひ,び,か' && pressed() === 'にち1', 'lectura principal: opcions i にち premuda (1) — ' + pressed());
+    ok($$('.bar .icon-btn.off').length === 2, 'mentre edites no hi ha fletxes');
+    type($('[data-e="meanings"]'), 'sol, dia, jornada');
+    type($('[data-e="mnemonic"]'), 'Una finestra amb el sol.');
+    mc('にち').click(); await sleep(20); mc('ひ').click(); await sleep(20);
+    $('.edit-bar [data-act="save"]').click(); await sleep(80);
+    const k1 = S.get('日');
+    ok(!$('.sheet.editing') && $('.hero-k').textContent === '日' && $('.means').textContent === 'sol · dia · jornada' && $('.mnemo p').textContent === 'Una finestra amb el sol.', 'desat: surts del mode edició, a la mateixa fitxa, amb els canvis');
+    ok(k1.reading === 'ひ' && k1.mainByUser && k1.edited && $('.is-main').textContent === 'ひ' && /ひ/.test($('.main-r').textContent), 'lectura principal: ara ひ');
+    ok(k1.meanings.en.join(',') === 'sun,day' && JSON.stringify(S.prog('日')) === prog日 && /Corregida/.test($('.facts').textContent), 'els altres idiomes i el progrés no es toquen; etiqueta «Corregida»');
+    $('[data-act="edit"]').click(); await sleep(60);
+    type($('[data-e="onyomi"]'), 'にち, ジツ');
+    $('.panel.check [data-act="save"]').click(); await sleep(60);
+    ok($('.sheet.editing') && !$('.edit-errors').hidden && /katakana/.test($('.edit-errors').textContent), 'on’yomi en hiragana: no desa i ho explica');
+    $('.edit-bar [data-act="cancel"]').click(); await sleep(60);
+    ok(!$('.sheet.editing') && S.get('日').onyomi.join(',') === 'ニチ,ジツ', 'cancel·lar: no es canvia res');
+    $('[data-act="edit"]').click(); await sleep(60);
+    $('.edit-bar [data-act="save"]').click(); await sleep(60);
+    ok(!$('.sheet.editing') && /No hi ha cap canvi/.test($('#toast').textContent), 'desar sense canvis: ho diu i no toca res');
+    await go('#/k/' + encodeURIComponent('学校'));
+    $('[data-act="edit"]').click(); await sleep(60);
+    ok($('[data-e="reading"]') && $('[data-e="reading"]').value === 'がっこう' && !$('[data-main-v]') && $('[data-e="reading2"]').value === '', 'paraula: es corregeix la lectura sencera i hi ha la segona, buida');
+    type($('[data-e="reading2"]'), 'manabiya');
+    $('.edit-bar [data-act="save"]').click(); await sleep(60);
+    ok($('.sheet.editing') && /ha de ser en kana/.test($('.edit-errors').textContent), 'paraula: la segona lectura ha de ser en kana');
+    type($('[data-e="reading2"]'), 'まなびや');
+    $('.edit-bar [data-act="save"]').click(); await sleep(80);
+    const gk = S.get('学校');
+    ok(!$('.sheet.editing') && gk.reading === 'がっこう' && gk.reading2 === 'まなびや' && gk.mainByUser && /がっこう.*gakkou \/ まなびや.*manabiya/.test($('.main-r').textContent.replace(/\s+/g, ' ')), 'paraula: dues lectures — ' + $('.main-r').textContent.trim().replace(/\s+/g, ' '));
+    ok($$('[data-say]').some(b => b.dataset.say === 'がっこう、まなびや'), 'paraula: l’altaveu diu les dues');
+    $('[data-act="edit"]').click(); await sleep(60);
+    type($('[data-e="reading2"]'), '');
+    $('.edit-bar [data-act="save"]').click(); await sleep(80);
+    ok(S.get('学校').reading2 === '' && !/まなびや/.test($('.main-r').textContent), 'paraula: buidar la segona la treu');
+    // Regenerar: la lectura que has triat es manté i t'avisa que les correccions es perdran
+    await go('#/afegir');
+    const arr2 = JSON.parse(SAMPLE.slice(SAMPLE.indexOf('['), SAMPLE.lastIndexOf(']') + 1));
+    type($('.paste'), '```json' + JSON.stringify([arr2[0]]) + '```');
+    await until(() => $$('.result .g-upd .rows > li').length === 1, 4000);
+    const wm = $('.result .g-upd .msgs').textContent;
+    ok(/correccions teves/.test(wm) && /Es manté la teva lectura principal \(ひ\)/.test(wm), 'regenerar: avisa de les correccions i manté ひ');
+    $('[data-act="apply"]').click(); await sleep(80);
+    ok(S.get('日').reading === 'ひ' && S.get('日').mainByUser && !S.get('日').edited, 'després de regenerar: ひ es manté; les correccions s’han substituït');
+
+    // Dues lectures principals: com 七 (しち / なな). Ordre del clic: 1 = primera, 2 = segona; màxim dues.
+    await go('#/k/' + encodeURIComponent('月')); await go('#/k/' + encodeURIComponent('日'));
+    $('[data-act="edit"]').click(); await sleep(60);
+    ok(pressed() === 'ひ1', 'edició: ひ premuda amb un 1');
+    mc('にち').click(); await sleep(20);
+    ok(pressed() === 'にち2,ひ1' && $('[data-main-max]').hidden, 'una segona: にち amb un 2 — ' + pressed());
+    mc('か').click(); await sleep(20);
+    ok(pressed() === 'にち2,ひ1' && !$('[data-main-max]').hidden, 'una tercera no entra i avisa que en treguis una');
+    mc('ひ').click(); await sleep(20);
+    ok(pressed() === 'にち1' && $('[data-main-max]').hidden, 'treus la 1a: にち passa a ser la 1a');
+    mc('ひ').click(); await sleep(20);
+    ok(pressed() === 'にち1,ひ2', 'tornes a posar ひ: ara és la 2a — ' + pressed());
+    type($('[data-e="kunyomi"]'), '-び, -か');
+    ok(pressed() === 'にち1', 'si treus ひ de les lectures, deixa d’estar triada');
+    type($('[data-e="kunyomi"]'), 'ひ, -び, -か'); mc('ひ').click(); await sleep(20);
+    $('.edit-bar [data-act="save"]').click(); await sleep(80);
+    const k2 = S.get('日'), mr = $('.main-r').textContent.replace(/\s+/g, ' ').trim();
+    ok(!$('.sheet.editing') && k2.reading === 'にち' && k2.reading2 === 'ひ' && k2.mainByUser && !k2.edited, 'desat: にち i ひ, sense marcar «Corregida» — ' + JSON.stringify({ e: !!$('.sheet.editing'), r: k2.reading, r2: k2.reading2, m: k2.mainByUser, ed: k2.edited, kun: k2.kunyomi, err: $('.edit-errors') && $('.edit-errors').textContent }));
+    ok($('.main-r small').textContent === 'Lectures principals' && /にち nichi \/ ひ hi/.test(mr) && $$('.is-main').length === 2, 'capçalera: ' + mr + ' i les dues ressaltades');
+    ok($$('[data-say]').some(b => b.dataset.say === 'にち、ひ'), 'l’altaveu de dalt diu les dues');
+    $('[data-act="edit"]').click(); await sleep(60);
+    mc('にち').click(); await sleep(20); mc('ひ').click(); await sleep(20);
+    $('.edit-bar [data-act="save"]').click(); await sleep(60);
+    ok($('.sheet.editing') && /almenys una lectura principal/.test($('.edit-errors').textContent), 'sense cap: no desa i demana que en triïs una');
+    $('.edit-bar [data-act="cancel"]').click(); await sleep(40);
+    await go('#/afegir');
+    type($('.paste'), '```json' + JSON.stringify([{ ...arr2[0], mnemonic: { ca: 'Una altra.', es: 'Otra.', en: 'Another.' } }]) + '```');
+    await until(() => $$('.result .g-upd .rows > li').length === 1, 4000);
+    ok(/Es mantenen les teves lectures principals \(にち \/ ひ\)/.test($('.result .g-upd .msgs').textContent), 'regenerar: avisa que es mantenen にち / ひ');
+    $('[data-act="apply"]').click(); await sleep(80);
+    ok(S.get('日').reading === 'にち' && S.get('日').reading2 === 'ひ' && S.get('日').mnemonic.ca === 'Una altra.', 'després de regenerar: les dues es mantenen');
+    type($('.paste'), '```json' + JSON.stringify([{ ...arr2[0], mnemonic: { ca: 'Una altra.', es: 'Otra.', en: 'Another.' } }]) + '```');
+    await sleep(200); await until(() => $$('.result .rows > li').length === 1, 4000);
+    ok($$('.result .g-same .rows > li').length === 1, 'la mateixa resposta un altre cop: «igual» (les teves lectures no compten com a canvi)');
+    type($('.paste'), '');
+
+    // Tecles V i E per verificar des del teclat
+    S.setVerified('月', false);
+    await go('#/k/' + encodeURIComponent('月'));
+    ok($('.panel.check .keys') && /V verificat · E té errors/.test($('.panel.check .keys').textContent), 'recordatori de les tecles a la fitxa');
+    key('v'); await sleep(30);
+    ok(S.get('月').verified === true && $('[data-act="verify"]').classList.contains('ver-ok') && !$('[data-ver-pill]').hidden && /月 · Verificat/.test($('#toast').textContent), 'tecla V: verificat (botó, etiqueta i avís)');
+    key('V'); await sleep(30);
+    ok(S.get('月').verified === false && $('[data-act="verify"]').classList.contains('ver-pending') && $('[data-ver-pill]').hidden, 'V un altre cop (també en majúscula): torna a per verificar');
+    key('e'); await sleep(30);
+    ok(S.get('月').verified === 'error' && $('[data-act="verify"]').classList.contains('ver-err'), 'tecla E: té errors');
+    key('e'); await sleep(30);
+    ok(S.get('月').verified === false, 'E un altre cop: per verificar');
+    key('ArrowRight'); await sleep(150); key('v'); await sleep(30);
+    ok($('.hero-k').textContent === '火' && S.get('火').verified === true, '→ i V: passes a la següent i la verifiques');
+    $('[data-act="edit"]').click(); await sleep(50);
+    const v火 = S.get('火').verified; key('e'); await sleep(30);
+    ok(S.get('火').verified === v火, 'mentre edites, les tecles no fan res');
+    $('.edit-bar [data-act="cancel"]').click(); await sleep(40);
+  } catch (e) { fails++; log('EXCEPCIÓ ' + e.stack); }
+  log(fails ? `\n${fails} FAILS` : '\nTOT OK');
+  document.title = 'done';
+  fetch('/result', { method: 'POST', body: out.textContent });
+})();
+</script>
+</body></html>
