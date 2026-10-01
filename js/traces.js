@@ -1,7 +1,8 @@
 // Ordre de traços animat amb dades de KanjiVG (© Ulrich Apel, CC BY-SA 3.0, https://kanjivg.tagaini.net).
 // De l'SVG descarregat només se'n llegeixen els camins i els números; el dibuix el fa aquest codi.
 const Traces = (() => {
-  const BASE = 'https://cdn.jsdelivr.net/gh/KanjiVG/kanjivg@r20260714/kanji/';
+  const { html } = U;
+  const BASE ='https://cdn.jsdelivr.net/gh/KanjiVG/kanjivg@r20260714/kanji/';
   const NS = 'http://www.w3.org/2000/svg';
   const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9.,eE\s-]+$/;
   const cache = new Map();
@@ -64,20 +65,25 @@ const Traces = (() => {
       at += dur + 160;
     });
   }
+  // Pinta l'ordre de traços de ch dins de box. expected: els traços que diu la fitxa (si no coincideixen, avisa).
   function mount(box, ch, expected) {
-    box.innerHTML = `<p class="so-msg">${U.esc(t('card.soLoading'))}</p>`;
+    const message = key => html`<p class="so-msg">${t(key)}</p>`;
+    box.innerHTML = message('card.soLoading');
     load(ch).then(data => {
-      if (!box.isConnected) return;
-      if (!data) { box.innerHTML = `<p class="so-msg">${U.esc(t('card.soMissing'))}</p>`; return; }
+      if (!box.isConnected) return; // ja has canviat de pantalla
+      if (!data) {
+        box.innerHTML = message('card.soMissing');
+        return;
+      }
       draw(box, data);
       if (expected && expected !== data.strokes.length) {
-        const p = document.createElement('p'); p.className = 'so-warn';
-        p.textContent = t('card.soMismatch', { a: expected, b: data.strokes.length });
-        box.appendChild(p);
+        box.insertAdjacentHTML('beforeend',
+          html`<p class="so-warn">${t('card.soMismatch', { a: expected, b: data.strokes.length })}</p>`);
       }
     }, () => {
       if (!box.isConnected) return;
-      box.innerHTML = `<p class="so-msg">${U.esc(t('card.soOffline'))}</p><button type="button" class="btn small" data-act="so-retry">${U.esc(t('card.soRetry'))}</button>`;
+      box.innerHTML = html`${message('card.soOffline')}
+        <button type="button" class="btn small" data-act="so-retry">${t('card.soRetry')}</button>`;
     });
   }
   return { mount, play };

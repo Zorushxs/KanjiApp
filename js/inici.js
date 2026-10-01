@@ -1,93 +1,137 @@
 // Pantalla d'inici: què toca avui, cerca, filtres (nivell JLPT i kanji/paraules), què es mostra i graella de fitxes.
 const Inici = (() => {
-  const { esc } = U;
-  const LEVELS = ['n5', 'n4', 'n3', 'n2', 'n1', 'none'];
-  let q = '', level = 'all';
-  const kinds = new Set(); // 'kanji' i/o 'word'; si no n'hi ha cap, es veuen tots dos
-  const lv = k => (k.jlpt ? 'n' + k.jlpt : 'none');
-  const kind = k => (U.isWord(k.kanji) ? 'word' : 'kanji');
-  const lvName = l => (l === 'none' ? t('home.noLevel') : l.toUpperCase());
-  const norm = s => U.hira(String(s).toLowerCase());
-  // Text on es busca: significats en tots els idiomes, lectures en kana i en rōmaji, i exemples.
-  const hay = k => {
-    const reads = [k.reading, k.reading2, ...k.onyomi, ...k.kunyomi.map(U.plain), ...k.examples.map(e => e.reading)].filter(Boolean);
-    return norm([k.kanji, ...Object.values(k.meanings).flat(), ...reads, ...reads.map(U.romaji), ...k.examples.map(e => e.word)].join(' '));
+  const { html } = U;
+  // Cerca i filtres. Es recorden mentre l'app és oberta (no en tornar-la a obrir).
+  const state = {
+    query: '',
+    level: 'all',
+    kinds: new Set(), // 'kanji' i/o 'word'; si no n'hi ha cap, es veuen tots dos
   };
 
-  // La llista tal com es veu (cerca + filtres). La fitxa la fa servir per anar a l'anterior i al següent.
-  function visible() {
-    const nq = norm(q.trim());
-    return Store.kanji.filter(k => (level === 'all' || lv(k) === level) && (!kinds.size || kinds.has(kind(k))) && (!nq || hay(k).includes(nq)));
+  // ---------- Cerca ----------
+  const normalize = text => U.hira(String(text).toLowerCase());
+  // Text on es busca: significats en tots els idiomes, lectures en kana i en rōmaji, i exemples.
+  function searchText(card) {
+    const readings = [
+      card.reading, card.reading2, ...card.onyomi, ...card.kunyomi.map(Card.plain), ...card.examples.map(e => e.reading),
+    ].filter(Boolean);
+    return normalize([
+      card.kanji,
+      ...Object.values(card.meanings).flat(),
+      ...readings,
+      ...readings.map(U.romaji),
+      ...card.examples.map(e => e.word),
+    ].join(' '));
   }
-  function tile(k, day) {
-    const p = Store.prog(k.kanji), box = p ? p.box : 0, due = !!p && p.due <= day, m = I18n.list(k.meanings)[0] || '';
-    const v = U.ver(k.verified), checked = v.cls !== 'pending';
-    const title = [box ? t('tile.box', { n: box }) : t('tile.new'), due ? t('tile.due') : '', checked ? t(v.key) : ''].filter(Boolean).join(' · ');
-    return `<a class="tile${due ? ' due' : ''}" href="${U.kanjiHref(k.kanji)}" title="${esc(title)}">
-      ${checked ? `<span class="tile-ver ver-${v.cls}" aria-hidden="true">${v.icon}</span>` : ''}
-      <span class="tile-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</span>
-      <span class="tile-m">${esc(m)}</span>
-      <span class="boxes" aria-hidden="true">${[1, 2, 3, 4, 5].map(i => `<i${i <= box ? ' class="f"' : ''}></i>`).join('')}</span>
-    </a>`;
-  }
-  // Interruptor sí/no (el mateix component que a Practicar).
-  const sw = (key, label) => `<label class="toggle small"><button type="button" class="switch" role="switch" aria-checked="${U.pref(key)}" data-pref="${key}"><i></i></button><span>${esc(label)}</span></label>`;
 
+  // La llista tal com es veu (cerca + filtres). La fitxa la fa servir per anar a l'anterior i a la següent.
+  function visible() {
+    const query = normalize(state.query.trim());
+    return Store.kanji.filter(card =>
+      (state.level === 'all' || Card.level(card) === state.level)
+      && (!state.kinds.size || state.kinds.has(Card.kind(card)))
+      && (!query || searchText(card).includes(query)));
+  }
+
+  // ---------- Pintar ----------
   function render(root) {
     const all = Store.kanji;
     if (!all.length) {
-      root.innerHTML = `<div class="empty"><div class="empty-k" lang="ja" aria-hidden="true">漢字</div>
-        <h1>${esc(t('home.emptyTitle'))}</h1><p>${esc(t('home.emptyText'))}</p>
-        <a class="btn primary" href="#/afegir">${esc(t('home.emptyBtn'))}</a></div>`;
+      root.innerHTML = html`<div class="empty"><div class="empty-k" lang="ja" aria-hidden="true">漢字</div>
+        <h1>${t('home.emptyTitle')}</h1><p>${t('home.emptyText')}</p>
+        <a class="btn primary" href="#/afegir">${t('home.emptyBtn')}</a></div>`;
       return;
     }
-    const day = U.today(), due = all.filter(k => Store.isDue(k.kanji, day)).length, fresh = all.filter(k => !Store.prog(k.kanji)).length;
-    const levels = LEVELS.filter(l => all.some(k => lv(k) === l)), hasWords = all.some(k => kind(k) === 'word');
-    if (level !== 'all' && !levels.includes(level)) level = 'all';
-    if (!hasWords) kinds.clear();
-    const chip = (l, label) => `<button type="button" class="chip${level === l ? ' on' : ''}" data-lv="${l}" aria-pressed="${level === l}">${esc(label)}</button>`;
-    const kchip = (k, label) => `<button type="button" class="chip${kinds.has(k) ? ' on' : ''}" data-kind="${k}" aria-pressed="${kinds.has(k)}">${esc(label)}</button>`;
-    root.innerHTML = `
-      <section class="today">
-        <div class="stat${due ? ' hot' : ''}"><b>${due}</b><span>${esc(t('home.due'))}</span></div>
-        <div class="stat"><b>${fresh}</b><span>${esc(t('home.new'))}</span></div>
-        <div class="stat"><b>${all.length}</b><span>${esc(t('home.total'))}</span></div>
-        <a class="btn primary" href="#/practica">${esc(t('home.practice'))}</a>
-      </section>
+    const day = U.today();
+    // Els filtres que ja no tenen sentit (cap fitxa d'aquell nivell, cap paraula) es treuen.
+    const levels = Card.LEVELS.filter(lv => all.some(card => Card.level(card) === lv));
+    const hasWords = all.some(card => Card.isWord(card.kanji));
+    if (state.level !== 'all' && !levels.includes(state.level)) state.level = 'all';
+    if (!hasWords) state.kinds.clear();
+
+    root.innerHTML = html`
+      ${todayStats(all, day)}
       <div class="finder">
-        <input type="search" class="search" value="${esc(q)}" placeholder="${esc(t('home.search'))}" aria-label="${esc(t('home.search'))}" autocomplete="off">
-        <div class="chips">${chip('all', t('home.all'))}${levels.map(l => chip(l, lvName(l))).join('')}
-          ${hasWords ? `<span class="chips-sep" aria-hidden="true"></span>${kchip('kanji', t('home.kanjiType'))}${kchip('word', t('home.wordType'))}` : ''}</div>
+        <input type="search" class="search" value="${state.query}" placeholder="${t('home.search')}"
+          aria-label="${t('home.search')}" autocomplete="off">
+        <div class="chips">${filterChips(levels, hasWords)}</div>
       </div>
-      <div class="view-opts"><span>${esc(t('home.show'))}</span>${sw('meanings', t('home.showMeanings'))}${sw('romaji', t('home.showRomaji'))}</div>
+      <div class="view-opts"><span>${t('home.show')}</span>
+        ${viewSwitch('meanings', t('home.showMeanings'))}${viewSwitch('romaji', t('home.showRomaji'))}</div>
       <p class="found" aria-live="polite"></p>
-      <div class="grid${U.pref('meanings') ? '' : ' hide-m'}"></div>`;
+      <div class="grid${Prefs.view('meanings') ? '' : ' hide-m'}"></div>`;
+
     const grid = root.querySelector('.grid'), found = root.querySelector('.found');
-    function paint() {
+    function paintGrid() {
       const list = visible();
-      grid.innerHTML = list.map(k => tile(k, day)).join('');
-      found.textContent = list.length === all.length ? '' : list.length ? t('home.count', { n: list.length, total: all.length }) : t('home.none');
+      grid.innerHTML = html`${list.map(card => Peces.tile(card, day))}`;
+      if (list.length === all.length) found.textContent = '';
+      else found.textContent = list.length ? t('home.count', { n: list.length, total: all.length }) : t('home.none');
     }
-    paint();
-    root.querySelector('.search').oninput = e => { q = e.target.value; paint(); };
-    root.querySelector('.chips').onclick = e => {
-      const b = e.target.closest('[data-lv]'), k = e.target.closest('[data-kind]');
-      if (b) {
-        level = b.dataset.lv;
-        root.querySelectorAll('[data-lv]').forEach(c => { c.classList.toggle('on', c === b); c.setAttribute('aria-pressed', c === b); });
-      } else if (k) { // Kanji / Paraules: cada un s'encén i s'apaga; cap encès = tots dos
-        const on = !kinds.has(k.dataset.kind);
-        if (on) kinds.add(k.dataset.kind); else kinds.delete(k.dataset.kind);
-        k.classList.toggle('on', on); k.setAttribute('aria-pressed', on);
-      } else return;
-      paint();
+    paintGrid();
+
+    root.querySelector('.search').oninput = e => {
+      state.query = e.target.value;
+      paintGrid();
     };
-    root.querySelector('.view-opts').onclick = e => {
-      const s = e.target.closest('[data-pref]'); if (!s) return;
-      if (s.dataset.pref === 'romaji') { U.setRomaji(!U.pref('romaji')); return; }
-      const v = U.pref('meanings', !U.pref('meanings'));
-      s.setAttribute('aria-checked', v); grid.classList.toggle('hide-m', !v);
-    };
+    U.onActions(root, {
+      level(chip) {
+        state.level = chip.dataset.lv;
+        root.querySelectorAll('[data-lv]').forEach(c => setPressed(c, c === chip));
+        paintGrid();
+      },
+      // Kanji / Paraules: cada un s'encén i s'apaga; cap encès = tots dos.
+      kind(chip) {
+        const kind = chip.dataset.kind, on = !state.kinds.has(kind);
+        if (on) state.kinds.add(kind);
+        else state.kinds.delete(kind);
+        setPressed(chip, on);
+        paintGrid();
+      },
+      pref(toggle) {
+        if (toggle.dataset.pref === 'romaji') {
+          Peces.setRomaji(!Prefs.view('romaji'));
+          return;
+        }
+        const show = Prefs.view('meanings', !Prefs.view('meanings'));
+        toggle.setAttribute('aria-checked', show);
+        grid.classList.toggle('hide-m', !show);
+      },
+    });
   }
+
+  // Per repassar avui, noves i total, i el botó de practicar.
+  function todayStats(all, day) {
+    const due = all.filter(card => Store.isDue(card.kanji, day)).length;
+    const fresh = all.filter(card => !Store.prog(card.kanji)).length;
+    return html`<section class="today">
+        <div class="stat${due ? ' hot' : ''}"><b>${due}</b><span>${t('home.due')}</span></div>
+        <div class="stat"><b>${fresh}</b><span>${t('home.new')}</span></div>
+        <div class="stat"><b>${all.length}</b><span>${t('home.total')}</span></div>
+        <a class="btn primary" href="#/practica">${t('home.practice')}</a>
+      </section>`;
+  }
+
+  // Botons de filtre: Tots, N5, N4… i, si tens paraules, Kanji i Paraules.
+  function filterChips(levels, hasWords) {
+    const chip = (attrs, on, label) => html`<button type="button" class="chip${on ? ' on' : ''}" ${attrs} aria-pressed="${on}">${label}</button>`;
+    const levelChip = (lv, label) => chip(html`data-act="level" data-lv="${lv}"`, state.level === lv, label);
+    const kindChip = (kind, label) => chip(html`data-act="kind" data-kind="${kind}"`, state.kinds.has(kind), label);
+    return html`${levelChip('all', t('home.all'))}${levels.map(lv => levelChip(lv, Card.levelName(lv)))}
+      ${hasWords ? html`<span class="chips-sep" aria-hidden="true"></span>${[
+        kindChip('kanji', t('home.kanjiType')),
+        kindChip('word', t('home.wordType')),
+      ]}` : ''}`;
+  }
+  function setPressed(chip, on) {
+    chip.classList.toggle('on', on);
+    chip.setAttribute('aria-pressed', on);
+  }
+
+  // Interruptor sí/no (el mateix component que a Practicar).
+  const viewSwitch = (key, label) => html`<label class="toggle small">
+    <button type="button" class="switch" role="switch" aria-checked="${Prefs.view(key)}" data-act="pref" data-pref="${key}"><i></i></button>
+    <span>${label}</span></label>`;
+
   return { nav: 'home', render, visible };
 })();

@@ -1,205 +1,316 @@
 // Pràctica amb repetició espaiada (sistema Leitner de 5 caixes). Les caixes i els dies són a store.js.
+// Dues pantalles: la preparació (#/practica) i la sessió (#/practica/sessio), que acaba amb un resum.
 const Practica = (() => {
-  const { esc } = U;
-  const KEY = 'kanji:practica', MODES = ['k2m', 'm2k'], SIZES = [10, 15, 20], GRADES = ['no', 'yes', 'doubt']; // ordre a la pantalla i tecles 1-2-3
-  const LEVELS = ['n5', 'n4', 'n3', 'n2', 'n1', 'none'], KINDS = ['all', 'kanji', 'word'];
-  let prefs = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
-  prefs = { mode: MODES.includes(prefs.mode) ? prefs.mode : 'k2m', size: SIZES.includes(prefs.size) ? prefs.size : 15, level: typeof prefs.level === 'string' ? prefs.level : 'all',
-    kind: KINDS.includes(prefs.kind) ? prefs.kind : 'all', again: prefs.again === true };
-  const savePrefs = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch {} };
-  // Sessió: { free, mode, queue: [{ ch, rep }], i, flipped, res, failed, done }. rep = segona passada d'una fallada.
-  let s = null, root = null, screen = 'setup';
-  const lv = k => (k.jlpt ? 'n' + k.jlpt : 'none');
-  const kind = k => (U.isWord(k.kanji) ? 'word' : 'kanji');
-  const pool = () => Store.kanji.filter(k => (prefs.level === 'all' || lv(k) === prefs.level) && (prefs.kind === 'all' || kind(k) === prefs.kind));
-  const boxOf = ch => { const p = Store.prog(ch); return p ? p.box : 0; };
-  const days = n => (n === 1 ? t('date.tomorrow') : t('pr.days', { n }));
+  const { html } = U;
+  const MODES = ['k2m', 'm2k']; // kanji → significat/lectura · significat → kanji
+  const SIZES = [10, 15, 20];
+  const GRADES = ['no', 'yes', 'doubt']; // ordre a la pantalla i tecles 1-2-3
+  const KINDS = ['all', 'kanji', 'word'];
 
-  function render(r, arg) {
-    root = r;
+  // Opcions de la preparació, recordades en aquest navegador.
+  const saved = Prefs.get('practice') || {};
+  const options = {
+    mode: MODES.includes(saved.mode) ? saved.mode : 'k2m',
+    size: SIZES.includes(saved.size) ? saved.size : 15,
+    level: typeof saved.level === 'string' ? saved.level : 'all',
+    kind: KINDS.includes(saved.kind) ? saved.kind : 'all',
+    again: saved.again === true, // tornar a practicar les d'avui
+  };
+  const saveOptions = () => Prefs.set('practice', options);
+
+  // Sessió en curs, o null:
+  // { free, mode, queue: [{ ch, rep }], i, flipped, res: { no, yes, doubt }, failed: [ch], done }
+  // free: repàs lliure (no desa res) · rep: segona passada d'una fallada · i: posició a la cua.
+  let session = null, root = null, screen = 'setup';
+
+  // Les fitxes que entren segons els filtres de nivell i de tipus.
+  const pool = () => Store.kanji.filter(card =>
+    (options.level === 'all' || Card.level(card) === options.level)
+    && (options.kind === 'all' || Card.kind(card) === options.kind));
+  const boxOf = ch => { const progress = Store.prog(ch); return progress ? progress.box : 0; };
+  const daysText = n => (n === 1 ? t('date.tomorrow') : t('pr.days', { n }));
+
+  function render(screenRoot, arg) {
+    root = screenRoot;
     if (arg === 'sessio') {
-      if (!s) { App.replace('#/practica'); return; } // p. ex. després de recarregar la pàgina
-      screen = 'session'; return s.done ? summary() : paint();
+      if (!session) { // p. ex. després de recarregar la pàgina
+        App.replace('#/practica');
+        return;
+      }
+      screen = 'session';
+      if (session.done) summary();
+      else paintCard();
+      return;
     }
-    screen = 'setup'; setup();
+    screen = 'setup';
+    setup();
   }
 
   // ---------- Preparació ----------
   function setup() {
     const all = Store.kanji;
     if (!all.length) {
-      root.innerHTML = `<h1 class="h">${esc(t('pr.title'))}</h1><div class="empty"><p>${esc(t('pr.empty'))}</p><a class="btn primary" href="#/afegir">${esc(t('nav.add'))}</a></div>`;
+      root.innerHTML = html`<h1 class="h">${t('pr.title')}</h1><div class="empty"><p>${t('pr.empty')}</p>
+        <a class="btn primary" href="#/afegir">${t('nav.add')}</a></div>`;
       return;
     }
-    const levels = LEVELS.filter(l => all.some(k => lv(k) === l)), hasWords = all.some(k => kind(k) === 'word');
-    if (prefs.level !== 'all' && !levels.includes(prefs.level)) prefs.level = 'all';
-    if (!hasWords) prefs.kind = 'all';
-    const P = pool(), day = U.today();
-    const due = P.filter(k => Store.isDue(k.kanji, day)).length, fresh = P.filter(k => !Store.prog(k.kanji)).length;
-    const today = prefs.again ? P.filter(k => Store.doneToday(k.kanji)).length : 0;
-    const n = Math.min(prefs.size, due + fresh + today);
-    const boxes = [0, 1, 2, 3, 4, 5].map(b => P.filter(k => boxOf(k.kanji) === b).length);
-    const radio = (name, v, label, on) => `<label><input type="radio" name="${name}" value="${v}"${on ? ' checked' : ''}><span>${esc(label)}</span></label>`;
-    const field = (name, legend, opts) => `<fieldset><legend>${esc(legend)}</legend><div class="seg">${opts.join('')}</div></fieldset>`;
-    root.innerHTML = `
-      <h1 class="h">${esc(t('pr.title'))}</h1>
+    // Els filtres que ja no tenen sentit (cap fitxa d'aquell nivell, cap paraula) es treuen.
+    const levels = Card.LEVELS.filter(lv => all.some(card => Card.level(card) === lv));
+    const hasWords = all.some(card => Card.isWord(card.kanji));
+    if (options.level !== 'all' && !levels.includes(options.level)) options.level = 'all';
+    if (!hasWords) options.kind = 'all';
+
+    const cards = pool(), day = U.today();
+    const due = cards.filter(card => Store.isDue(card.kanji, day)).length;
+    const fresh = cards.filter(card => !Store.prog(card.kanji)).length;
+    const today = options.again ? cards.filter(card => Store.doneToday(card.kanji)).length : 0;
+    const count = Math.min(options.size, due + fresh + today);
+    const boxes = [0, 1, 2, 3, 4, 5].map(box => cards.filter(card => boxOf(card.kanji) === box).length);
+
+    root.innerHTML = html`
+      <h1 class="h">${t('pr.title')}</h1>
       <section class="panel">
-        <p class="big-line">${esc(t('pr.dueNew', { due, new: fresh }) + (prefs.again ? ' · ' + t('pr.todayCount', { n: today }) : ''))}</p>
-        <div class="bx">${boxes.map((c, b) => `<div class="b${b}"><b>${c}</b><span>${esc(b ? t('pr.box', { n: b }) : t('pr.boxNew'))}</span></div>`).join('')}</div>
-        <p class="hint">${esc(t('pr.explain'))}</p>
+        <p class="big-line">${t('pr.dueNew', { due, new: fresh }) + (options.again ? ' · ' + t('pr.todayCount', { n: today }) : '')}</p>
+        <div class="bx">${boxes.map((n, box) =>
+          html`<div class="b${box}"><b>${n}</b><span>${box ? t('pr.box', { n: box }) : t('pr.boxNew')}</span></div>`)}</div>
+        <p class="hint">${t('pr.explain')}</p>
       </section>
       <section class="panel setup">
-        ${field('mode', t('pr.mode'), MODES.map(m => radio('mode', m, t('pr.mode.' + m), prefs.mode === m)))}
-        ${field('size', t('pr.size'), SIZES.map(z => radio('size', z, String(z), prefs.size === z)))}
-        ${levels.length > 1 ? field('level', t('pr.level'), [radio('level', 'all', t('home.all'), prefs.level === 'all'),
-          ...levels.map(l => radio('level', l, l === 'none' ? t('home.noLevel') : l.toUpperCase(), prefs.level === l))]) : ''}
-        ${hasWords ? field('kind', t('pr.kind'), [radio('kind', 'all', t('home.all'), prefs.kind === 'all'),
-          radio('kind', 'kanji', t('home.kanjiType'), prefs.kind === 'kanji'), radio('kind', 'word', t('home.wordType'), prefs.kind === 'word')]) : ''}
+        ${setupFields(levels, hasWords)}
         <div class="toggle">
-          <button type="button" class="switch" role="switch" aria-checked="${prefs.again}" data-act="again" aria-labelledby="againLbl" aria-describedby="againHint"><i></i></button>
-          <div><span id="againLbl" class="toggle-l">${esc(t('pr.againToggle'))}</span><p id="againHint" class="hint">${esc(t('pr.againHint'))}</p></div>
+          <button type="button" class="switch" role="switch" aria-checked="${options.again}" data-act="again"
+            aria-labelledby="againLbl" aria-describedby="againHint"><i></i></button>
+          <div><span id="againLbl" class="toggle-l">${t('pr.againToggle')}</span><p id="againHint" class="hint">${t('pr.againHint')}</p></div>
         </div>
-        ${n ? `<button type="button" class="btn primary big" data-act="start">${esc(t('pr.start', { n }))}</button>`
-          : `<p class="big-line">${esc(P.length ? t('pr.allDone') : t('pr.nothing'))}</p>
-             ${P.length ? `<button type="button" class="btn big" data-act="free">${esc(t('pr.free'))}</button><p class="hint">${esc(t('pr.freeHint'))}</p>` : ''}`}
+        ${count ? html`<button type="button" class="btn primary big" data-act="start">${t('pr.start', { n: count })}</button>`
+          : html`<p class="big-line">${cards.length ? t('pr.allDone') : t('pr.nothing')}</p>
+             ${cards.length ? html`<button type="button" class="btn big" data-act="free">${t('pr.free')}</button>
+               <p class="hint">${t('pr.freeHint')}</p>` : ''}`}
       </section>`;
+
+    // Un canvi d'opció torna a pintar la pantalla (els números canvien) i deixa el focus on era.
     root.onchange = e => {
-      const i = e.target;
-      if (i.name === 'mode') prefs.mode = i.value;
-      else if (i.name === 'size') prefs.size = +i.value;
-      else if (i.name === 'level') prefs.level = i.value;
-      else if (i.name === 'kind') prefs.kind = i.value;
-      else return;
-      savePrefs(); setup();
-      const f = root.querySelector(`input[name="${i.name}"]:checked`); if (f) f.focus();
+      const radio = e.target;
+      if (!['mode', 'size', 'level', 'kind'].includes(radio.name)) return;
+      options[radio.name] = radio.name === 'size' ? +radio.value : radio.value;
+      saveOptions();
+      setup();
+      const focused = root.querySelector(`input[name="${radio.name}"]:checked`);
+      if (focused) focused.focus();
     };
-    root.onclick = e => {
-      const b = e.target.closest('[data-act]'); if (!b) return;
-      if (b.dataset.act === 'again') { prefs.again = !prefs.again; savePrefs(); setup(); root.querySelector('.switch').focus(); }
-      else start(b.dataset.act === 'free');
-    };
+    U.onActions(root, {
+      again() {
+        options.again = !options.again;
+        saveOptions();
+        setup();
+        root.querySelector('.switch').focus();
+      },
+      start: () => start(false),
+      free: () => start(true),
+    });
   }
 
-  // Primer els que toquen (els més endarrerits i de caixes baixes), després els nous i, si l'interruptor
-  // és actiu, els que ja has practicat avui; i es barregen.
-  // El repàs lliure agafa els de caixes més baixes i no desa res.
+  // Grups de botons d'opció: mode, quantes, nivell (si n'hi ha més d'un) i tipus (si tens paraules).
+  function setupFields(levels, hasWords) {
+    const radio = (name, value, label) => html`<label><input type="radio" name="${name}" value="${value}"
+      ${options[name] === value ? html` checked` : ''}><span>${label}</span></label>`;
+    const group = (legend, radios) => html`<fieldset><legend>${legend}</legend><div class="seg">${radios}</div></fieldset>`;
+    return html`
+      ${group(t('pr.mode'), MODES.map(mode => radio('mode', mode, t('pr.mode.' + mode))))}
+      ${group(t('pr.size'), SIZES.map(size => radio('size', size, String(size))))}
+      ${levels.length > 1 ? group(t('pr.level'), [
+        radio('level', 'all', t('home.all')),
+        ...levels.map(lv => radio('level', lv, Card.levelName(lv))),
+      ]) : ''}
+      ${hasWords ? group(t('pr.kind'), [
+        radio('kind', 'all', t('home.all')),
+        radio('kind', 'kanji', t('home.kanjiType')),
+        radio('kind', 'word', t('home.wordType')),
+      ]) : ''}`;
+  }
+
+  // Primer les que toquen (les més endarrerides i de caixes baixes), després les noves i, si l'interruptor
+  // és actiu, les que ja has practicat avui; i es barregen. El repàs lliure agafa les de caixes més baixes
+  // i no desa res.
   function start(free) {
-    const P = pool(), day = U.today();
+    const cards = pool(), day = U.today();
     let list;
-    if (free) list = U.shuffle(P.slice()).sort((a, b) => boxOf(a.kanji) - boxOf(b.kanji)).slice(0, prefs.size);
-    else {
-      const due = P.filter(k => Store.isDue(k.kanji, day)).sort((a, b) => {
-        const x = Store.prog(a.kanji), y = Store.prog(b.kanji);
-        return x.due.localeCompare(y.due) || x.box - y.box;
+    if (free) {
+      list = U.shuffle(cards.slice()).sort((a, b) => boxOf(a.kanji) - boxOf(b.kanji)).slice(0, options.size);
+    } else {
+      const due = cards.filter(card => Store.isDue(card.kanji, day)).sort((a, b) => {
+        const pa = Store.prog(a.kanji), pb = Store.prog(b.kanji);
+        return pa.due.localeCompare(pb.due) || pa.box - pb.box;
       });
-      const again = prefs.again ? U.shuffle(P.filter(k => Store.doneToday(k.kanji))) : [];
-      list = due.concat(P.filter(k => !Store.prog(k.kanji)), again).slice(0, prefs.size);
+      const fresh = cards.filter(card => !Store.prog(card.kanji));
+      const again = options.again ? U.shuffle(cards.filter(card => Store.doneToday(card.kanji))) : [];
+      list = due.concat(fresh, again).slice(0, options.size);
     }
     if (!list.length) return;
-    s = { free, mode: prefs.mode, queue: U.shuffle(list.map(k => ({ ch: k.kanji, rep: false }))), i: 0, flipped: false, res: { no: 0, doubt: 0, yes: 0 }, failed: [], done: false };
+    session = {
+      free,
+      mode: options.mode,
+      queue: U.shuffle(list.map(card => ({ ch: card.kanji, rep: false }))),
+      i: 0,
+      flipped: false,
+      res: { no: 0, doubt: 0, yes: 0 },
+      failed: [],
+      done: false,
+    };
     location.hash = '#/practica/sessio';
   }
 
   // ---------- Sessió ----------
   // Totes les lectures (la principal, destacada) amb el rōmaji al costat.
-  function reads(k) {
-    if (!k.onyomi.length && !k.kunyomi.length) return ''; // les paraules només tenen la lectura principal
-    const one = (r, fmt) => (U.isMain(k, r) ? `<b class="is-main">${fmt(r)}</b>` : fmt(r));
-    const line = (label, arr, fmt) => arr.length
-      ? `<span class="rl"><small>${esc(label)}</small><span lang="ja">${arr.map(r => one(r, fmt)).join('、')}</span><span class="ros">${U.roList(arr)}</span></span>` : '';
-    return `<div class="reads">${line(t('card.on'), k.onyomi, esc)}${line(t('card.kun'), k.kunyomi, U.kun)}</div>` +
-      U.say([...k.onyomi, ...k.kunyomi].map(U.plain).join('、'), t('card.listenReadings'));
+  function readings(card) {
+    if (!card.onyomi.length && !card.kunyomi.length) return ''; // les paraules només tenen la lectura principal
+    const line = (label, list, format) => (list.length
+      ? html`<span class="rl"><small>${label}</small><span lang="ja">${Peces.readingList(card, list, { format })}</span><span
+          class="ros">${Peces.roList(list)}</span></span>`
+      : '');
+    const lines = [line(t('card.on'), card.onyomi), line(t('card.kun'), card.kunyomi, Peces.kun)];
+    return html`<div class="reads">${lines}</div>${Peces.say(Card.readingsToSay(card), t('card.listenReadings'))}`;
   }
   // La lectura que s'aprèn primer (camp "reading"), amb el rōmaji i la veu. Les fitxes antigues no en tenen.
-  const mainLine = k => (k.reading
-    ? `<div class="ans-main">${U.mainHtml(k)}${U.say(U.mains(k).join('、'), t('card.listenMain'))}</div>` : '');
-  // Revers: kanji → significat/lectura mostra el significat; significat → kanji, el kanji. Totes dues, les lectures.
-  function back(k) {
-    const means = esc(I18n.list(k.meanings).join(' · ')), emoji = k.emoji ? ` <span aria-hidden="true">${esc(k.emoji)}</span>` : '';
-    const mn = I18n.tr(k.mnemonic);
-    const top = s.mode === 'm2k' ? `<div class="big-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</div>` : `<div class="ans-m">${means}${emoji}</div>`;
-    return top + mainLine(k) + `<div class="ans-r">${reads(k)}</div>` +
-      (mn ? `<p class="ans-mn">${esc(mn)}</p>` : '') + `<a class="lnk" href="${U.kanjiHref(k.kanji)}">${esc(t('pr.seeCard'))}</a>`;
+  function mainReading(card) {
+    if (!card.reading) return '';
+    return html`<div class="ans-main">${Peces.mainHtml(card)}${Peces.say(Card.mains(card).join('、'), t('card.listenMain'))}</div>`;
   }
-  function paint() {
-    while (s.i < s.queue.length && !Store.get(s.queue[s.i].ch)) s.i++; // per si n'has esborrat algun a mitja sessió
-    if (s.i >= s.queue.length) return summary();
-    const it = s.queue[s.i], k = Store.get(it.ch), total = s.queue.length;
-    const front = s.mode === 'm2k'
-      ? `<div class="big-m">${esc(I18n.list(k.meanings).join(' · '))}</div>`
-      : `<div class="big-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</div>`;
-    const next = g => { const d = Store.nextDays(it.ch, g); return d === null ? t('pr.keep') : days(d); };
-    const hint = g => (s.free || it.rep ? '' : `<small>${esc(next(g))}</small>`);
-    root.innerHTML = `
+  const meanings = card => I18n.list(card.meanings).join(' · ');
+  const bigKanji = card => html`<div class="big-k${Card.sizeClass(card.kanji)}" lang="ja">${card.kanji}</div>`;
+
+  // Davant: el kanji (k2m) o el significat (m2k).
+  const front = card => (session.mode === 'm2k' ? html`<div class="big-m">${meanings(card)}</div>` : bigKanji(card));
+  // Revers: el que no hi havia davant, la lectura principal, totes les lectures, la mnemotècnia i l'enllaç a la fitxa.
+  function back(card) {
+    const emoji = card.emoji ? html` <span aria-hidden="true">${card.emoji}</span>` : '';
+    const mnemonic = I18n.tr(card.mnemonic);
+    const top = session.mode === 'm2k' ? bigKanji(card) : html`<div class="ans-m">${meanings(card)}${emoji}</div>`;
+    return html`${top}${mainReading(card)}<div class="ans-r">${readings(card)}</div>
+      ${mnemonic ? html`<p class="ans-mn">${mnemonic}</p>` : ''}<a class="lnk" href="${Card.href(card.kanji)}">${t('pr.seeCard')}</a>`;
+  }
+
+  function paintCard() {
+    // Per si n'has esborrat alguna a mitja sessió.
+    while (session.i < session.queue.length && !Store.get(session.queue[session.i].ch)) session.i++;
+    if (session.i >= session.queue.length) {
+      summary();
+      return;
+    }
+    const item = session.queue[session.i], card = Store.get(item.ch), total = session.queue.length;
+    // Sota cada botó, quan tornarà (no surt al repàs lliure ni a la segona passada d'una fallada).
+    const when = grade => {
+      if (session.free || item.rep) return '';
+      const days = Store.nextDays(item.ch, grade);
+      return html`<small>${days === null ? t('pr.keep') : daysText(days)}</small>`;
+    };
+    const flipped = session.flipped;
+    root.innerHTML = html`
       <div class="ses-top">
-        <button type="button" class="btn ghost" data-act="quit">${U.ICON.close}<span>${esc(t('pr.quit'))}</span></button>
-        <div class="pbar" role="progressbar" aria-label="${esc(t('pr.progress'))}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${s.i}"><i style="width:${(s.i / total) * 100}%"></i></div>
-        <span class="pos">${s.i + 1}/${total}</span>
+        <button type="button" class="btn ghost" data-act="quit">${U.ICON.close}<span>${t('pr.quit')}</span></button>
+        <div class="pbar" role="progressbar" aria-label="${t('pr.progress')}" aria-valuemin="0" aria-valuemax="${total}"
+          aria-valuenow="${session.i}"><i style="width:${(session.i / total) * 100}%"></i></div>
+        <span class="pos">${session.i + 1}/${total}</span>
       </div>
-      <div class="ses-tags">${s.free ? `<span class="tag">${esc(t('pr.freeTag'))}</span>` : ''}${U.romajiBtn()}</div>
-      <div class="flash${s.flipped ? ' open' : ''}" ${s.flipped ? 'tabindex="-1"' : `role="button" tabindex="0" data-act="flip" aria-label="${esc(t('pr.flipLabel'))}"`}>
-        ${it.rep ? `<span class="again">${esc(t('pr.again'))}</span>` : ''}
-        <p class="q">${esc(t('pr.q.' + s.mode))}</p>
-        ${front}
-        ${s.flipped ? `<div class="rev">${back(k)}</div>` : ''}
+      <div class="ses-tags">${session.free ? html`<span class="tag">${t('pr.freeTag')}</span>` : ''}${Peces.romajiBtn()}</div>
+      <div class="flash${flipped ? ' open' : ''}" ${flipped
+        ? html`tabindex="-1"`
+        : html`role="button" tabindex="0" data-act="flip" aria-label="${t('pr.flipLabel')}"`}>
+        ${item.rep ? html`<span class="again">${t('pr.again')}</span>` : ''}
+        <p class="q">${t('pr.q.' + session.mode)}</p>
+        ${front(card)}
+        ${flipped ? html`<div class="rev">${back(card)}</div>` : ''}
       </div>
       <div class="answer">
-        ${s.flipped
-          ? `<div class="grade">${GRADES.map(g => `<button type="button" class="btn ${g}" data-g="${g}"><span>${esc(t('pr.' + g))}</span>${hint(g)}</button>`).join('')}</div>`
-          : `<button type="button" class="btn primary big" data-act="flip">${esc(t('pr.flip'))}</button>`}
-        <p class="keys">${esc(t('pr.keys'))}</p>
+        ${flipped
+          ? html`<div class="grade">${GRADES.map(grade => html`<button type="button" class="btn ${grade}" data-act="grade"
+              data-g="${grade}"><span>${t('pr.' + grade)}</span>${when(grade)}</button>`)}</div>`
+          : html`<button type="button" class="btn primary big" data-act="flip">${t('pr.flip')}</button>`}
+        <p class="keys">${t('pr.keys')}</p>
       </div>`;
-    if (s.flipped) root.querySelector('.flash').focus({ preventScroll: true });
-    root.onclick = e => {
-      if (e.target.closest('[data-say], a')) return;
-      const b = e.target.closest('[data-g], [data-act]'); if (!b) return;
-      if (b.dataset.g) answer(b.dataset.g);
-      else if (b.dataset.act === 'flip') flip();
-      else if (b.dataset.act === 'quit') { s = null; App.back(); }
-    };
+    if (flipped) root.querySelector('.flash').focus({ preventScroll: true });
+    U.onActions(root, {
+      grade: button => answer(button.dataset.g),
+      flip,
+      quit() {
+        session = null;
+        App.back();
+      },
+    });
   }
+
+  // Gira la targeta: es plega, es pinta el revers i es desplega.
   function flip() {
-    if (!s || s.flipped || s.done) return;
-    s.flipped = true;
-    const card = root.querySelector('.flash');
-    if (!card || matchMedia('(prefers-reduced-motion: reduce)').matches) return paint();
-    card.classList.add('turn'); // es plega, es pinta el revers i es desplega
-    setTimeout(() => { if (screen !== 'session' || !s) return; paint(); root.querySelector('.flash').classList.add('unturn'); }, 140);
-  }
-  // Només compta la primera resposta. Si falles, surt un altre cop al final de la sessió (sense tornar a puntuar).
-  function answer(g) {
-    if (!s || !s.flipped) return;
-    const it = s.queue[s.i];
-    Store.tally(); // el calendari compta totes les respostes
-    if (!it.rep) {
-      s.res[g]++;
-      if (!s.free) Store.review(it.ch, g);
-      if (g === 'no') { s.failed.push(it.ch); s.queue.push({ ch: it.ch, rep: true }); }
+    if (!session || session.flipped || session.done) return;
+    session.flipped = true;
+    const flash = root.querySelector('.flash');
+    if (!flash || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      paintCard();
+      return;
     }
-    s.i++; s.flipped = false; paint();
+    flash.classList.add('turn');
+    setTimeout(() => {
+      if (screen !== 'session' || !session) return; // has sortit mentre girava
+      paintCard();
+      root.querySelector('.flash').classList.add('unturn');
+    }, 140);
   }
+
+  // Només compta la primera resposta. Si falles, surt un altre cop al final de la sessió (sense tornar a puntuar).
+  function answer(grade) {
+    if (!session || !session.flipped) return;
+    const item = session.queue[session.i];
+    Store.tally(); // el calendari compta totes les respostes
+    if (!item.rep) {
+      session.res[grade]++;
+      if (!session.free) Store.review(item.ch, grade);
+      if (grade === 'no') {
+        session.failed.push(item.ch);
+        session.queue.push({ ch: item.ch, rep: true });
+      }
+    }
+    session.i++;
+    session.flipped = false;
+    paintCard();
+  }
+
   function summary() {
-    s.done = true;
-    const cell = g => `<div class="r-${g}"><b>${s.res[g]}</b><span>${esc(t('pr.' + g))}</span></div>`;
-    const failed = s.failed.map(ch => Store.get(ch)).filter(Boolean);
-    root.innerHTML = `
+    session.done = true;
+    const result = grade => html`<div class="r-${grade}"><b>${session.res[grade]}</b><span>${t('pr.' + grade)}</span></div>`;
+    const failed = session.failed.map(ch => Store.get(ch)).filter(Boolean);
+    root.innerHTML = html`
       <section class="panel summary">
-        <h1 class="h">${esc(t('pr.done'))}</h1>
-        ${s.free ? `<p class="tag">${esc(t('pr.freeTag'))}</p>` : ''}
-        <div class="res">${GRADES.map(cell).join('')}</div>
+        <h1 class="h">${t('pr.done')}</h1>
+        ${session.free ? html`<p class="tag">${t('pr.freeTag')}</p>` : ''}
+        <div class="res">${GRADES.map(result)}</div>
         ${failed.length
-          ? `<h2>${esc(t('pr.toReview'))}</h2><div class="grid">${failed.map(k => `<a class="tile" href="${U.kanjiHref(k.kanji)}"><span class="tile-k${U.size(k.kanji)}" lang="ja">${esc(k.kanji)}</span><span class="tile-m">${esc(I18n.list(k.meanings)[0] || '')}</span></a>`).join('')}</div>`
-          : `<p class="big-line">${esc(t('pr.perfect'))}</p>`}
-        <div class="row"><button type="button" class="btn primary" data-act="again">${esc(t('pr.another'))}</button><a class="btn" href="#/">${esc(t('pr.home'))}</a></div>
+          ? html`<h2>${t('pr.toReview')}</h2><div class="grid">${failed.map(card => Peces.tile(card))}</div>`
+          : html`<p class="big-line">${t('pr.perfect')}</p>`}
+        <div class="row"><button type="button" class="btn primary" data-act="again">${t('pr.another')}</button>
+          <a class="btn" href="#/">${t('pr.home')}</a></div>
       </section>`;
-    root.onclick = e => { if (e.target.closest('[data-act="again"]')) { s = null; location.hash = '#/practica'; } };
+    U.onActions(root, {
+      again() {
+        session = null;
+        location.hash = '#/practica';
+      },
+    });
   }
+
+  // Espai o Retorn giren la targeta; 1, 2 i 3 responen No, Sí i Dubte.
   function key(e) {
-    if (screen !== 'session' || !s || s.done) return;
+    if (screen !== 'session' || !session || session.done) return;
     if (e.key === ' ' || e.key === 'Enter') {
       if (e.target.closest && e.target.closest('button, a')) return; // el botó ja respon sol
-      if (!s.flipped) { e.preventDefault(); flip(); }
-    } else if (s.flipped && ['1', '2', '3'].includes(e.key)) { e.preventDefault(); answer(GRADES[+e.key - 1]); }
+      if (!session.flipped) {
+        e.preventDefault();
+        flip();
+      }
+    } else if (session.flipped && ['1', '2', '3'].includes(e.key)) {
+      e.preventDefault();
+      answer(GRADES[+e.key - 1]);
+    }
   }
+
   return { nav: 'practice', render, key };
 })();

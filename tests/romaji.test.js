@@ -2,7 +2,7 @@
 const vm = require('vm'), fs = require('fs');
 const ctx = { console, localStorage: { getItem: () => null, setItem() {} }, document: {}, navigator: {} };
 ctx.window = ctx; vm.createContext(ctx);
-vm.runInContext(['i18n', 'util'].map(f => fs.readFileSync(require('path').join(__dirname, '..', 'js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.U = U;', ctx);
+vm.runInContext(['prefs', 'i18n', 'util'].map(f => fs.readFileSync(require('path').join(__dirname, '..', 'js', f + '.js'), 'utf8')).join('\n;\n') + '\n;globalThis.U = U;', ctx);
 const cases = {
   'いち': 'ichi', 'ニチ': 'nichi', 'ジツ': 'jitsu', 'にほん': 'nihon', 'まいにち': 'mainichi', 'きょう': 'kyou',
   'がっこう': 'gakkou', 'まっちゃ': 'matcha', 'きんようび': "kin'youbi", 'せんせい': 'sensei', 'コーヒー': 'koohii',

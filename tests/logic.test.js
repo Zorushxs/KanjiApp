@@ -10,10 +10,10 @@ const ctx = {
 };
 ctx.window = ctx;
 vm.createContext(ctx);
-const src = ['i18n', 'util', 'almacen', 'validar', 'store', 'prompt'].map(f => fs.readFileSync(APP + f + '.js', 'utf8')).join('\n;\n')
-  + '\n;globalThis.__ = { I18n, U, Validar, Store, Prompt, t };';
+const src = ['prefs', 'i18n', 'util', 'card', 'peces', 'almacen', 'validar', 'store', 'prompt'].map(f => fs.readFileSync(APP + f + '.js', 'utf8')).join('\n;\n')
+  + '\n;globalThis.__ = { Prefs, I18n, U, Card, Peces, Validar, Store, Prompt, t };';
 vm.runInContext(src, ctx);
-const { I18n, U, Validar, Store, Prompt, t } = ctx.__;
+const { Prefs, I18n, U, Card, Peces, Validar, Store, Prompt, t } = ctx.__;
 let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.log('FAIL', msg); } else console.log('ok  ', msg); };
 
@@ -180,8 +180,8 @@ wc = Validar.check({ ...wcard, reading: '' });
 ok(!wc.item && wc.errors.some(e => e.k === 'val.wordReading'), 'paraula sense lectura → error');
 wc = Validar.check({ ...wcard, kanji: 'potato' });
 ok(!wc.item && wc.errors.some(e => e.k === 'val.kanji'), 'paraula que no és japonès → error');
-ok(Validar.isWord('学校') && Validar.isWord('じゃがいも') && !Validar.isWord('日') && !Validar.isCard('a b'), 'isWord / isCard');
-ok(U.isWord('食べる') && !U.isWord('日') && U.size('日') === '' && U.size('学校') === ' w2' && U.size('じゃがいも') === ' w4', 'U.isWord i U.size');
+ok(Card.isWord('学校') && Card.isWord('じゃがいも') && !Card.isWord('日') && !Validar.isCard('a b'), 'isWord / isCard');
+ok(Card.isWord('食べる') && !Card.isWord('日') && Card.sizeClass('日') === '' && Card.sizeClass('学校') === ' w2' && Card.sizeClass('じゃがいも') === ' w4', 'Card.isWord i Card.sizeClass');
 Store.load({ kanji: [good, wcard], progress: { 'じゃがいも': { box: 2, due: '2026-10-05', seen: 1, fails: 0 } } });
 ok(Store.kanji.length === 2 && Store.prog('じゃがいも').box === 2, 'Store: desa paraules i el seu progrés');
 const noteTxt = `Normalment en kana: poma (りんご)
@@ -230,8 +230,8 @@ const seven = { ...good, kanji: '七', meanings: { ca: ['set'], en: ['seven'] },
 const mine7 = Validar.coerce({ ...seven, reading2: 'なな', mainByUser: true });
 ok(mine7.reading2 === 'なな', 'coerce conserva la segona lectura');
 ok(Validar.check({ ...seven, reading2: 'なな' }).item.reading2 === '', 'de Claude, la segona lectura sempre surt buida');
-ok(U.mains(mine7).join() === 'しち,なな' && U.isMain(mine7, 'なな.つ') && !U.isMain(mine7, 'なの'), 'U.mains i U.isMain tenen en compte les dues');
-ok(/しち.*shichi.*\/.*なな.*nana/.test(U.mainHtml(mine7)), 'U.mainHtml: しち shichi / なな nana');
+ok(Card.mains(mine7).join() === 'しち,なな' && Card.isMain(mine7, 'なな.つ') && !Card.isMain(mine7, 'なの'), 'Card.mains i Card.isMain tenen en compte les dues');
+ok(/しち.*shichi.*\/.*なな.*nana/.test(Peces.mainHtml(mine7)), 'Peces.mainHtml: しち shichi / なな nana');
 Store.load({ kanji: [mine7] });
 let r7 = Validar.review(JSON.stringify([seven]), Store.get)[0];
 ok(r7.status === 'same', 'regenerar igual (lectura しち) amb les teves dues lectures: «igual» — ' + r7.status);
@@ -256,4 +256,44 @@ Store.merge([rw.item]);
 ok(Store.get('今日').reading === 'きょう' && Store.get('今日').reading2 === 'こんにち', '... i es desa');
 Store.merge([Validar.check({ ...kyo, reading: 'こんにち' }).item]);
 ok(Store.get('今日').reading === 'こんにち' && Store.get('今日').reading2 === '', 'si la nova lectura és la teva segona, no es repeteix');
+
+// Plantilla html`…`: escapa el text (també als atributs), deixa l'HTML niat i uneix les llistes
+const evil = '<img src=x onerror=alert(1)>', evilEsc = '&lt;img src=x onerror=alert(1)&gt;';
+ok(String(U.html`<p title="${evil}">${evil}</p>`) === `<p title="${evilEsc}">${evilEsc}</p>`, 'html escapa el text');
+ok(String(U.html`<ul>${['a', U.html`<b>${'<'}</b>`]}</ul>`) === '<ul>a<b>&lt;</b></ul>', 'html: llistes i html niat');
+ok(String(U.html`${null}${undefined}${0}`) === '0', 'html: null i undefined no pinten res; 0 sí');
+ok(String(U.html`<b aria-pressed="${false}" hidden="${true}">`) === '<b aria-pressed="false" hidden="true">', 'html: true i false s’escriuen (atributs aria)');
+ok(String(U.join(['a', '<'], U.html`<i>,</i>`)) === 'a<i>,</i>&lt;' && String(U.raw('<b>')) === '<b>', 'join i raw');
+const actBtn = { dataset: { act: 'hola' } };
+actBtn.closest = () => actBtn;
+const fakeRoot = { contains: () => true };
+let acted = null;
+U.onActions(fakeRoot, { hola: el => { acted = el; } });
+fakeRoot.onclick({ target: { closest: () => actBtn } });
+ok(acted === actBtn, 'onActions crida l’acció del data-act');
+
+// Peces: trossos d'HTML
+ok(String(Peces.mark('<日>本日', '日')) === '&lt;<mark>日</mark>&gt;本<mark>日</mark>', 'Peces.mark ressalta i escapa');
+ok(String(Peces.kun('た.べる')) === 'た<span class="oku">べる</span>', 'Peces.kun: okurigana a part');
+ok(Peces.say('') === '' && /data-say="にち"/.test(String(Peces.say('にち'))), 'Peces.say');
+ok(/class="is-main" title="principal">ニチ<\/b><span class="sep">、<\/span>ジツ/.test(String(Peces.readingList({ ...good, reading: 'にち' }, ['ニチ', 'ジツ'],
+  { separator: U.html`<span class="sep">、</span>`, title: 'principal' }))), 'Peces.readingList destaca la principal');
+
+// Card: regles d'una fitxa
+ok(Card.plain('た.べる') === 'たべる' && Card.stem('た.べる') === 'た' && Card.stem('-び') === 'び', 'Card.plain i Card.stem');
+ok(Card.readingsToSay(good) === 'ニチ、ジツ、ひ、び、か', 'Card.readingsToSay: ' + Card.readingsToSay(good));
+ok(Card.mainCandidates({ onyomi: ['ニチ'], kunyomi: ['た.べる'] }).join() === 'にち,にち,たべる,た', 'Card.mainCandidates');
+ok(Card.level({ jlpt: 5 }) === 'n5' && Card.level({ jlpt: null }) === 'none' && Card.kind({ kanji: '学校' }) === 'word', 'Card.level i Card.kind');
+ok(Card.nextVerified(false) === true && Card.nextVerified(true) === 'error' && Card.nextVerified('error') === false
+  && Card.verState('x').cls === 'pending', 'Card: estats de verificació');
+ok(Card.href('日') === '#/k/%E6%97%A5' && Card.jisho('学校').endsWith('%E5%AD%A6%E6%A0%A1'), 'Card.href i Card.jisho');
+
+// Prefs: preferències del navegador
+Prefs.set('theme', 'dark');
+Prefs.set('practice', { size: 20 });
+ok(store['kanji:tema'] === 'dark' && Prefs.get('theme') === 'dark' && Prefs.get('practice').size === 20, 'Prefs: text pla i objectes');
+store['kanji:avis'] = '1';
+ok(!!Prefs.get('notice') && Prefs.get('add') === null, 'Prefs: format antic de l’avís i null si no hi ha res');
+ok(Prefs.view('meanings') === true && Prefs.view('meanings', false) === false && JSON.parse(store['kanji:vista']).meanings === false, 'Prefs.view');
+
 console.log(fails ? `\n${fails} FAILS` : '\nTOT OK');

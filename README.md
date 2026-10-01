@@ -54,8 +54,11 @@ Si el navegador té una veu japonesa, la fa servir i funciona sense connexió. S
 ```
 index.html          Esquelet de la pàgina
 css/styles.css      Estils (mobile-first, tema clar/fosc amb variables)
+js/prefs.js         Preferències del navegador (totes les claus de localStorage)
 js/i18n.js          Tots els textos de la interfície (ca/es/en)
-js/util.js          Utilitats: escapament, dates, kana, icones, avisos
+js/util.js          Utilitats: plantilla html que escapa sola, clics, dates, kana, icones, avisos
+js/card.js          Regles d'una fitxa: tipus, nivell, lectures principals, verificació
+js/peces.js         Trossos d'HTML compartits: rōmaji, lectures, veu, rajola
 js/almacen.js       Persistència (JSON al disc + còpia al navegador)
 js/validar.js       Lectura i validació del JSON que ve de la IA
 js/store.js         Estat: kanji + progrés, fusió i caixes Leitner
@@ -68,6 +71,7 @@ js/afegir.js        Pantalla: afegir kanji
 js/practica.js      Pantalla: pràctica
 js/calendari.js     Pantalla: calendari de pràctica
 js/app.js           Rutes, tema, idioma, arxiu, exportar/importar
+tools/versio.js     Apuja el ?v=N d'index.html (node tools/versio.js)
 ```
 
 Per provar-la en local: `python -m http.server` dins de la carpeta i obre `http://localhost:8000`.

@@ -68,35 +68,45 @@ Language style:
   "esdevenir", "abans" rather than "antigament".
 - Spanish: natural, everyday Spanish from Spain.`;
 
-  const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
+  const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
 
   // list: kanji sols i paraules (les paraules les escrius entre 「」 a la pantalla Afegir).
   function cards(list) {
-    const ks = list.filter(x => !U.isWord(x)), ws = list.filter(U.isWord);
-    const what = [ks.length && `these kanji: ${ks.join('、')}`, ws.length && `these words: ${ws.join('、')}`].filter(Boolean).join(', and ');
+    const kanji = list.filter(x => !Card.isWord(x)), words = list.filter(Card.isWord);
+    const what = [
+      kanji.length && `these kanji: ${kanji.join('、')}`,
+      words.length && `these words: ${words.join('、')}`,
+    ].filter(Boolean).join(', and ');
     return `You are a Japanese teacher. Create study cards for ${what}.
 
 I'm a beginner: I know hiragana and katakana, but few kanji. ${FORMAT}`;
   }
 
   // "Els kanjis que tinc apresos són [llista] i en vull aprendre X d'aquesta temàtica; i, a més, aquestes paraules."
-  // have / haveWords: els kanji sols i les paraules de la col·lecció; n: quants kanji de la temàtica (o, sense
-  // temàtica ni paraules, dels més útils); words: paraules concretes, que van a més a més i no compten per a n.
+  // - have / haveWords: els kanji sols i les paraules que ja tens;
+  // - n: quants kanji de la temàtica (o, sense temàtica ni paraules, dels més útils);
+  // - words: paraules concretes, que van a més a més i no compten per a n.
   function more({ have, haveWords = [], n, theme, words }) {
-    const t = clean(theme), w = clean(words);
+    const themeText = clean(theme), wordsText = clean(words);
     const known = [
       have.length ? `The kanji I have already learned are: ${have.join(', ')}` : `I haven't learned any kanji yet.`,
       haveWords.length && `The words I have already learned are: ${haveWords.join(', ')}`,
     ].filter(Boolean).join('\n');
-    const kanjiPart = (t || !w) && `I want to learn ${n} new kanji: ${t ? `about this theme: "${t}"`
-      : 'the most useful ones for a beginner, in the usual learning order (JLPT N5 first, then N4)'}.
+
+    const which = themeText
+      ? `about this theme: "${themeText}"`
+      : 'the most useful ones for a beginner, in the usual learning order (JLPT N5 first, then N4)';
+    // Sense temàtica però amb paraules, només es demanen les paraules.
+    const kanjiPart = (themeText || !wordsText) && `I want to learn ${n} new kanji: ${which}.
 Only choose kanji that are normally used in everyday writing (not ones usually replaced by kana).`;
-    const wordPart = w && `${t ? 'In addition to those kanji, I' : 'I'} want to learn these specific words: ${w}
+
+    const wordPart = wordsText && `${themeText ? 'In addition to those kanji, I' : 'I'} want to learn these specific words: ${wordsText}
 (they may be written in Catalan, Spanish or English). For each one, choose the word a Japanese
 person would normally use in everyday life, at beginner level, written the way it is normally
 written in Japan: it can be a compound of several kanji, kanji with hiragana, or only kana
 (e.g. patata → じゃがいも, not 芋; escola → 学校). Make a word card for each of these words, and
 also a kanji card for each kanji in them that I haven't learned yet.`;
+
     return `You are a Japanese teacher. I'm a beginner: I know hiragana and katakana.
 ${known}
 

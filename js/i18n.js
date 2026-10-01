@@ -819,14 +819,22 @@ const I18n = (() => {
       'foot.strokes': 'Stroke order:',
     },
   };
-  const KEY = 'kanji:idioma', LOCALES = { ca: 'ca-ES', es: 'es-ES', en: 'en-GB' };
-  let lang = (() => { try { const l = localStorage.getItem(KEY); if (TEXTS[l]) return l; } catch {} return 'ca'; })();
+  const LOCALES = { ca: 'ca-ES', es: 'es-ES', en: 'en-GB' };
+  let lang = TEXTS[Prefs.get('lang')] ? Prefs.get('lang') : 'ca';
 
-  const t = (key, vars) => String(TEXTS[lang][key] ?? TEXTS.en[key] ?? key)
-    .replace(/\{(\w+)\}/g, (m, k) => (vars && k in vars ? vars[k] : m));
+  // Text de la interfície en l'idioma triat. {n}, {k}… es substitueixen pels valors de vars.
+  function t(key, vars) {
+    const text = String(TEXTS[lang][key] ?? TEXTS.en[key] ?? key);
+    return text.replace(/\{(\w+)\}/g, (match, name) => (vars && name in vars ? vars[name] : match));
+  }
+
   // Textos de contingut { ca, es, en }: l'idioma triat i, si està buit, el primer que n'hi hagi.
-  const tr = p => (p && (p[lang] || Object.values(p).find(Boolean))) || '';
-  const list = m => (m && m[lang] && m[lang].length ? m[lang] : Object.values(m || {}).find(a => a && a.length)) || [];
+  const tr = texts => (texts && (texts[lang] || Object.values(texts).find(Boolean))) || '';
+  // El mateix per a llistes { ca: [...], es: [...], en: [...] } (els significats).
+  function list(lists) {
+    if (lists && lists[lang] && lists[lang].length) return lists[lang];
+    return Object.values(lists || {}).find(items => items && items.length) || [];
+  }
 
   // Omple els textos fixos d'index.html: data-i18n (text), data-i18n-title, data-i18n-aria.
   function apply(root = document) {
@@ -835,15 +843,18 @@ const I18n = (() => {
     root.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
     root.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   }
-  function set(l) {
-    if (!TEXTS[l]) return;
-    lang = l; try { localStorage.setItem(KEY, l); } catch {}
+
+  function set(newLang) {
+    if (!TEXTS[newLang]) return;
+    lang = newLang;
+    Prefs.set('lang', newLang);
     apply();
   }
+
   return {
     t, tr, list, apply, set,
     langs: Object.keys(TEXTS),
-    name: l => TEXTS[l]['lang.name'],
+    name: code => TEXTS[code]['lang.name'],
     get lang() { return lang; },
     get locale() { return LOCALES[lang] || lang; },
   };

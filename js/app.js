@@ -1,135 +1,227 @@
 // Arrencada, rutes (#/...), tema, idioma, estat de desat, arxiu i exportar/importar.
+// Cada pantalla és un objecte { nav, render(root, arg), key(e) }: nav diu quina pestanya s'encén,
+// render pinta la pantalla dins de root i key (opcional) rep les tecles.
 const App = (() => {
-  const { $, esc } = U;
+  const { $, html } = U;
   const ROUTES = { '': Inici, k: Fitxa, afegir: Afegir, practica: Practica, calendari: Calendari };
-  let current = null, lastHash = null, idx = null, replacing = false, saveState = 'saved';
+  let current = null;       // pantalla que es veu
+  let lastHash = null;      // per saber si es repinta la mateixa pantalla
+  let saveState = 'saved';  // saving | saved | error
 
-  // ---------- Rutes ----------
-  // Cada entrada de l'historial guarda la seva posició (i) per saber si "tornar" queda dins de l'app.
+  // ---------- Historial ----------
+  // Cada entrada de l'historial guarda la seva posició (i) per saber si «tornar» queda dins de l'app.
+  let historyIndex = null, replacing = false;
   function stamp() {
-    const st = history.state;
-    if (st && Number.isInteger(st.i)) idx = st.i;
-    else { idx = idx === null ? 0 : replacing ? idx : idx + 1; history.replaceState({ i: idx }, ''); }
+    const saved = history.state;
+    if (saved && Number.isInteger(saved.i)) {
+      historyIndex = saved.i;
+    } else {
+      if (historyIndex === null) historyIndex = 0;
+      else if (!replacing) historyIndex++;
+      history.replaceState({ i: historyIndex }, '');
+    }
     replacing = false;
   }
+  // Canvia de pantalla sense afegir una entrada a l'historial (fitxa anterior i següent).
+  function replace(hash) {
+    replacing = true;
+    location.replace(hash);
+  }
+  // Enrere dins de l'app; si has entrat directament en aquesta pantalla, a l'inici.
+  function back() {
+    if (historyIndex > 0) history.back();
+    else location.hash = '#/';
+  }
+
+  // ---------- Rutes ----------
   function route() {
     stamp();
     const [name, ...rest] = location.hash.replace(/^#\/?/, '').split('/');
-    let arg = rest.join('/'); try { arg = decodeURIComponent(arg); } catch {}
+    let arg = rest.join('/');
+    try { arg = decodeURIComponent(arg); } catch {}
     current = ROUTES[name] || Inici;
     // Si es repinta la mateixa pantalla (p. ex. en canviar d'idioma), els desplegables oberts es queden oberts.
-    const reopen = location.hash === lastHash ? [...$('#view').querySelectorAll('details[data-fold][open]')].map(d => d.dataset.fold) : [];
-    const root = document.createElement('div'); root.className = 'screen';
+    const samePage = location.hash === lastHash;
+    const reopen = samePage ? [...$('#view').querySelectorAll('details[data-fold][open]')].map(d => d.dataset.fold) : [];
+    const root = document.createElement('div');
+    root.className = 'screen';
     $('#view').replaceChildren(root);
     current.render(root, arg);
-    reopen.forEach(f => { const d = root.querySelector(`details[data-fold="${f}"]`); if (d) d.open = true; });
-    document.querySelectorAll('[data-nav]').forEach(a => {
-      const on = a.dataset.nav === current.nav;
-      a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    reopen.forEach(fold => {
+      const details = root.querySelector(`details[data-fold="${fold}"]`);
+      if (details) details.open = true;
     });
-    if (location.hash !== lastHash) { lastHash = location.hash; scrollTo(0, 0); }
-    renderBanner(); renderBadge();
+    document.querySelectorAll('[data-nav]').forEach(link => {
+      const on = link.dataset.nav === current.nav;
+      link.classList.toggle('on', on);
+      if (on) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    if (!samePage) {
+      lastHash = location.hash;
+      scrollTo(0, 0);
+    }
+    renderBanner();
+    renderBadge();
   }
   window.addEventListener('hashchange', route);
-  const replace = h => { replacing = true; location.replace(h); };
-  const back = () => (idx > 0 ? history.back() : (location.hash = '#/'));
 
+  // ---------- Tecles i clics de tota l'app ----------
+  // Les tecles van a la pantalla, excepte si escrius en un camp o hi ha Ctrl, Alt o Cmd.
   document.addEventListener('keydown', e => {
-    const el = e.target.closest ? e.target : document.body;
-    if (!current || !current.key || e.ctrlKey || e.metaKey || e.altKey || el.closest('input, textarea, select')) return;
+    const target = e.target.closest ? e.target : document.body;
+    if (!current || !current.key || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (target.closest('input, textarea, select')) return;
     current.key(e);
   });
+  // Botons de veu (data-say) i de rōmaji (data-romaji-toggle), a qualsevol pantalla.
   document.addEventListener('click', e => {
-    const b = e.target.closest('[data-say]'); if (!b) return;
-    Veu.say(b.dataset.say).catch(() => U.toast(t('card.noAudio'), 'warn'));
+    const sayButton = e.target.closest('[data-say]');
+    if (sayButton) Veu.say(sayButton.dataset.say).catch(() => U.toast(t('card.noAudio'), 'warn'));
+    if (e.target.closest('[data-romaji-toggle]')) Peces.setRomaji(!Prefs.view('romaji'));
   });
 
-  // ---------- Tema i idioma ----------
-  const setTheme = th => { document.documentElement.dataset.theme = th; try { localStorage.setItem('kanji:tema', th); } catch {} };
-  if (!document.documentElement.dataset.theme) setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  // ---------- Tema, rōmaji i idioma ----------
+  function setTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    Prefs.set('theme', theme);
+  }
+  if (!document.documentElement.dataset.theme) {
+    setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }
   $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-  // Rōmaji visible o amagat a tot arreu: interruptor a l'inici i botó «Rōmaji» a la fitxa i a la pràctica.
-  U.setRomaji(U.pref('romaji'));
-  document.addEventListener('click', e => { if (e.target.closest('[data-romaji-toggle]')) U.setRomaji(!U.pref('romaji')); });
+  Peces.setRomaji(Prefs.view('romaji'));
 
   // Un botó per cada idioma d'i18n.js, amb el nom de l'idioma escrit en el mateix idioma.
-  $('#langs').innerHTML = I18n.langs.map(l => `<button type="button" data-lang="${l}" lang="${l}" title="${esc(I18n.name(l))}" aria-label="${esc(I18n.name(l))}">${l.toUpperCase()}</button>`).join('');
-  const renderLangs = () => document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === I18n.lang));
+  $('#langs').innerHTML = html`${I18n.langs.map(lang => html`<button type="button" data-lang="${lang}" lang="${lang}"
+    title="${I18n.name(lang)}" aria-label="${I18n.name(lang)}">${lang.toUpperCase()}</button>`)}`;
+  function renderLangs() {
+    document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === I18n.lang));
+  }
   $('#langs').onclick = e => {
-    const b = e.target.closest('[data-lang]'); if (!b || b.dataset.lang === I18n.lang) return;
-    I18n.set(b.dataset.lang); renderLangs(); renderState(saveState); route();
+    const button = e.target.closest('[data-lang]');
+    if (!button || button.dataset.lang === I18n.lang) return;
+    I18n.set(button.dataset.lang);
+    renderLangs();
+    renderState(saveState);
+    route();
   };
 
-  // ---------- Estat de desat i avisos d'arxiu ----------
-  function renderState(s) {
-    saveState = s;
+  // ---------- Estat de desat i fitxes per repassar ----------
+  function renderState(state) {
+    saveState = state;
     const dest = Almacen.mode === 'file' ? Almacen.name : t('file.browser');
-    $('#saveState').textContent = s === 'saving' ? t('file.saving') : s === 'error' ? t('file.error') : t('file.savedIn', { dest });
-    $('#saveState').dataset.s = s;
+    const el = $('#saveState');
+    if (state === 'saving') el.textContent = t('file.saving');
+    else if (state === 'error') el.textContent = t('file.error');
+    else el.textContent = t('file.savedIn', { dest });
+    el.dataset.s = state;
   }
   function renderBadge() {
-    const day = U.today(), n = Store.kanji.filter(k => Store.isDue(k.kanji, day)).length, b = $('#dueBadge');
-    b.textContent = n; b.hidden = !n;
+    const day = U.today(), badge = $('#dueBadge');
+    const due = Store.kanji.filter(card => Store.isDue(card.kanji, day)).length;
+    badge.textContent = due;
+    badge.hidden = !due;
   }
-  Store.onStatus(s => { renderState(s); renderBadge(); });
+  Store.onStatus(state => {
+    renderState(state);
+    renderBadge();
+  });
 
-  const dismissed = () => { try { return localStorage.getItem('kanji:avis') === '1'; } catch { return false; } };
-  // L'avís només surt a l'inici, per no molestar mentre practiques.
+  // ---------- Avís de l'arxiu (només a l'inici, per no molestar mentre practiques) ----------
   function renderBanner() {
-    const b = $('#banner'), m = Almacen.mode;
-    if (current !== Inici || m === 'file' || (m === 'local' && !Almacen.canFile && dismissed())) { b.hidden = true; b.innerHTML = ''; return; }
-    if (m === 'permiso') {
-      b.innerHTML = `<p>${esc(t('file.permiso', { name: Almacen.name }))}</p><button type="button" class="btn primary" data-b="reconnect">${esc(t('file.reconnect'))}</button>`;
-    } else if (Almacen.canFile) {
-      b.innerHTML = `<p>${esc(t('file.local'))}</p>
-        <button type="button" class="btn primary" data-b="create">${esc(t('file.create'))}</button><button type="button" class="btn" data-b="open">${esc(t('file.open'))}</button>`;
-    } else {
-      b.innerHTML = `<p>${esc(t('file.noFS'))}</p><button type="button" class="icon-btn" data-b="dismiss" title="${esc(t('file.dismiss'))}" aria-label="${esc(t('file.dismiss'))}">${U.ICON.close}</button>`;
+    const banner = $('#banner'), mode = Almacen.mode;
+    const hide = current !== Inici || mode === 'file' || (mode === 'local' && !Almacen.canFile && Prefs.get('notice'));
+    if (hide) {
+      banner.hidden = true;
+      banner.innerHTML = '';
+      return;
     }
-    b.hidden = false;
+    if (mode === 'permiso') {
+      banner.innerHTML = html`<p>${t('file.permiso', { name: Almacen.name })}</p>
+        <button type="button" class="btn primary" data-act="reconnect">${t('file.reconnect')}</button>`;
+    } else if (Almacen.canFile) {
+      banner.innerHTML = html`<p>${t('file.local')}</p>
+        <button type="button" class="btn primary" data-act="create">${t('file.create')}</button><button
+          type="button" class="btn" data-act="open">${t('file.open')}</button>`;
+    } else {
+      banner.innerHTML = html`<p>${t('file.noFS')}</p><button type="button" class="icon-btn" data-act="dismiss"
+        title="${t('file.dismiss')}" aria-label="${t('file.dismiss')}">${U.ICON.close}</button>`;
+    }
+    banner.hidden = false;
   }
-  $('#banner').onclick = e => {
-    const a = e.target.closest('[data-b]'); if (!a) return;
-    const k = a.dataset.b;
-    if (k === 'reconnect') connect(Almacen.reconnect);
-    else if (k === 'create') connect(() => Almacen.create(Store.snapshot()));
-    else if (k === 'open') connect(Almacen.open);
-    else if (k === 'dismiss') { try { localStorage.setItem('kanji:avis', '1'); } catch {} renderBanner(); }
-  };
-  async function connect(fn) {
+  U.onActions($('#banner'), {
+    reconnect: () => connect(Almacen.reconnect),
+    create: () => connect(() => Almacen.create(Store.snapshot())),
+    open: () => connect(Almacen.open),
+    dismiss() {
+      Prefs.set('notice', true);
+      renderBanner();
+    },
+  });
+
+  // ---------- Arxiu ----------
+  // Connecta amb un arxiu (obrir, crear o tornar a donar permís) i en carrega les dades si en té.
+  async function connect(action) {
     try {
-      const r = await fn();
-      if (r.data && Array.isArray(r.data.kanji) && r.data.kanji.length) Store.load(r.data);
-      else if (r.data === null || r.data === undefined) await Store.flush();
-      route(); renderState('saved');
-    } catch (e) { if (e.name !== 'AbortError') alert(t('file.openFail', { msg: e.message })); }
+      const result = await action();
+      if (result.data && Array.isArray(result.data.kanji) && result.data.kanji.length) Store.load(result.data);
+      else if (result.data === null || result.data === undefined) await Store.flush(); // arxiu nou o buit: s'hi desa el que tens
+      route();
+      renderState('saved');
+    } catch (e) {
+      if (e.name !== 'AbortError') alert(t('file.openFail', { msg: e.message })); // AbortError: has tancat el selector
+    }
   }
-  $('#fileBtn').onclick = () => Almacen.canFile
-    ? connect(() => confirm(t('file.ask')) ? Almacen.open() : Almacen.create(Store.snapshot()))
-    : alert(t('file.noPicker'));
+  $('#fileBtn').onclick = () => {
+    if (!Almacen.canFile) {
+      alert(t('file.noPicker'));
+      return;
+    }
+    connect(() => (confirm(t('file.ask')) ? Almacen.open() : Almacen.create(Store.snapshot())));
+  };
 
   // ---------- Exportar / importar ----------
   $('#exportBtn').onclick = () => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(Store.snapshot(), null, 2)], { type: 'application/json' }));
-    a.download = 'kanji.json'; a.click(); URL.revokeObjectURL(a.href);
+    const json = JSON.stringify(Store.snapshot(), null, 2);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    link.download = 'kanji.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
   $('#importBtn').onclick = () => $('#importInput').click();
   $('#importInput').onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
+    const file = e.target.files[0];
+    if (!file) return;
     try {
-      const d = JSON.parse(await f.text());
-      if (!d || !Array.isArray(d.kanji)) throw new Error(t('file.importNoList'));
+      const data = JSON.parse(await file.text());
+      if (!data || !Array.isArray(data.kanji)) throw new Error(t('file.importNoList'));
       if (!confirm(t('file.importConfirm'))) return;
-      Store.load(d); await Store.flush(); route(); renderState('saved');
-    } catch (err) { alert(t('file.importFail', { msg: err.message })); }
-    finally { e.target.value = ''; }
+      Store.load(data);
+      await Store.flush();
+      route();
+      renderState('saved');
+    } catch (err) {
+      alert(t('file.importFail', { msg: err.message }));
+    } finally {
+      e.target.value = ''; // per poder tornar a triar el mateix arxiu
+    }
   };
 
   // ---------- Arrencada ----------
   (async () => {
-    try { const r = await Almacen.init(); Store.load(r.data); } catch (e) { console.error(e); }
-    I18n.apply(); renderLangs(); renderState('saved'); route();
+    try {
+      const result = await Almacen.init();
+      Store.load(result.data);
+    } catch (e) {
+      console.error(e);
+    }
+    I18n.apply();
+    renderLangs();
+    renderState('saved');
+    route();
   })();
+
   return { back, replace };
 })();
