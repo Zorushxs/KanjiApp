@@ -114,8 +114,28 @@ const Validar = (() => {
     return { item: errors.length ? null : k, kanji: k.kanji, errors, warnings: n.list };
   }
 
+  // Si la resposta s'ha tallat (és massa llarga) o té algun tros mal format, aprofita les fitxes { … } de la
+  // llista que han arribat senceres. Recorre el text tenint en compte les cometes i els escapaments.
+  const BS = String.fromCharCode(92);
+  function salvage(b) {
+    const a = b.indexOf('['), out = [];
+    if (a < 0) return out;
+    let depth = 0, start = -1, inStr = false, esc = false;
+    for (let i = a + 1; i < b.length; i++) {
+      const c = b[i];
+      if (inStr) { if (esc) esc = false; else if (c === BS) esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === '{') { if (depth === 0) start = i; depth++; }
+      else if (c === '}' && depth > 0) {
+        depth--;
+        if (depth === 0) { try { out.push(JSON.parse(b.slice(start, i + 1))); } catch {} }
+      } else if (c === ']' && depth === 0) break;
+    }
+    return out;
+  }
+
   // Treu el JSON de la resposta: un o més blocs ```json, o el tros entre el primer [ { i l'últim ] }.
-  // Si el bloc no es tanca (resposta tallada), s'intenta igualment perquè l'error ho expliqui.
+  // Si el bloc no es tanca (resposta tallada), se n'aprofiten les fitxes senceres i la llista es marca «partial».
   function extract(text) {
     const s = String(text || '');
     const blocks = [...s.matchAll(/```[a-zA-Z]*[ \t]*\r?\n?([\s\S]*?)```/g)].map(m => m[1].trim()).filter(Boolean);
@@ -126,7 +146,11 @@ const Validar = (() => {
       try { d = JSON.parse(b); }
       catch (e) {
         try { d = JSON.parse(b.replace(/,\s*([\]}])/g, '$1')); } // comes finals, un error típic
-        catch { throw new Error(t('add.badJson', { msg: e.message })); }
+        catch {
+          d = salvage(b);
+          if (!d.length) throw new Error(t('add.badJson', { msg: e.message }));
+          out.partial = true;
+        }
       }
       if (d && !Array.isArray(d) && Array.isArray(d.kanji)) d = d.kanji;
       else if (d && typeof d === 'object' && !Array.isArray(d)) d = [d];
@@ -150,7 +174,8 @@ const Validar = (() => {
   // Previsualització: cada element amb el seu estat (new | upd | same | err). get(ch) torna el kanji actual.
   const same = (a, b) => JSON.stringify({ ...a, verified: false }) === JSON.stringify(b);
   function review(text, get) {
-    const rows = extract(text).map(check), last = new Map();
+    const raws = extract(text), rows = raws.map(check), last = new Map();
+    rows.partial = !!raws.partial; // la resposta s'ha tallat: només hi ha les fitxes que han arribat senceres
     rows.forEach((r, i) => { if (r.item) last.set(r.item.kanji, i); });
     rows.forEach((r, i) => {
       if (!r.item) { r.status = 'err'; return; }

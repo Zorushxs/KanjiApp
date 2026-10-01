@@ -10,7 +10,7 @@ HTML, CSS i JavaScript sense dependències ni compilació. Es publica tal qual a
    - **Trio els kanjis**: escriu els kanji; per a una paraula sencera, posa-la entre 「」 (「学校」). Els que ja tens no hi van (surten en gris); toca'n un si el vols regenerar.
    - **Claude tria els kanjis**: una temàtica i quants kanji en vols (si no hi poses número, 10) i, a més a més, les paraules concretes que vulguis saber escriure. Claude dona cada paraula tal com s'escriu habitualment al Japó i a nivell inicial (patata → じゃがいも, escola → 学校), en fa la fitxa i també la dels kanji nous que tingui. El prompt porta tots els teus kanji i paraules perquè no te'n repeteixi cap.
 2. Enganxa el prompt a [Claude.ai](https://claude.ai) i copia'n la resposta.
-3. Enganxa-la a l'app: la valida, en mostra una previsualització (nous, actualitzats, errors) i la fusiona per caràcter.
+3. Enganxa-la a l'app: la valida, en mostra una previsualització (nous, actualitzats, errors) i la fusiona per caràcter. Si en demanes molts i la resposta arriba tallada, desa les fitxes que han arribat senceres i et deixa copiar el prompt dels que falten.
 
 Si regeneres un kanji que ja tens, se'n substitueix el contingut i se'n conserva el progrés de pràctica.
 

@@ -92,6 +92,7 @@ const Afegir = (() => {
       if (c) { const ch = c.dataset.ch; if (regen.has(ch)) regen.delete(ch); else regen.add(ch); paintPicked($); paintResult($); return; }
       const b = e.target.closest('[data-act]'); if (!b) return;
       if (b.dataset.act === 'copy') copy($);
+      else if (b.dataset.act === 'copy-missing') clip($, Prompt.cards(missingList()));
       else if (b.dataset.act === 'review') { clearTimeout(timer); runReview(); paintResult($); }
       else if (b.dataset.act === 'apply') {
         const r = Store.merge(rows.filter(x => x.status === 'new' || x.status === 'upd').map(x => x.item));
@@ -113,16 +114,19 @@ const Afegir = (() => {
     const has = ks.some(ch => Store.get(ch));
     box.innerHTML = ks.map(chip).join('') +
       (has ? `<p class="hint">${esc(go.length ? t('add.existsLegend') : t('add.allExist'))}</p>` : '') +
-      (has && go.length ? `<p class="hint"><b>${esc(t('add.inPrompt', { n: go.length }))}</b></p>` : '') +
-      (go.length > 12 ? `<p class="warn">${esc(t('add.tooMany'))}</p>` : '');
+      (has && go.length ? `<p class="hint"><b>${esc(t('add.inPrompt', { n: go.length }))}</b></p>` : '');
     $('.ptext').value = mode === 'own' ? prompt() : '';
   }
-  async function copy($) {
+  function copy($) {
     if (mode === 'own') {
       if (!pick(input).length) { U.toast(t('add.none'), 'warn'); $('.kin').focus(); return; }
       if (!forPrompt().length) { U.toast(t('add.allExist'), 'warn'); return; }
     }
-    const text = prompt();
+    clip($, prompt());
+  }
+  // Els kanji o paraules que has demanat i que no són a la resposta (p. ex. perquè s'ha tallat).
+  const missingList = () => (mode === 'own' && rows ? forPrompt().filter(ch => !rows.some(r => r.kanji === ch)) : []);
+  async function clip($, text) {
     try { await navigator.clipboard.writeText(text); U.toast(t('add.copied')); }
     catch { // sense permís de porta-retalls: ensenya el prompt perquè el copiïs a mà
       const d = $('.pview'), ta = $('.ptext'); ta.value = text; d.hidden = false; d.open = true; ta.focus(); ta.select();
@@ -156,11 +160,13 @@ const Afegir = (() => {
     }
     if (!rows) { box.hidden = true; box.innerHTML = ''; return; }
     const by = g => rows.filter(r => r.status === g), n = by('new').length + by('upd').length;
-    const got = new Set(rows.map(r => r.kanji)), missing = mode === 'own' ? forPrompt().filter(ch => !got.has(ch)) : [];
+    const missing = missingList(), good = rows.filter(r => r.item).length;
     box.hidden = false;
     box.innerHTML = `<h2><span class="n">3</span>${esc(t('add.step3'))}</h2>
       ${note ? `<p class="note"><b>${esc(t('add.note'))}:</b> ${esc(note)}</p>` : ''}
-      ${missing.length ? `<p class="warn">${esc(t('add.missing', { list: missing.join(' ') }))}</p>` : ''}
+      ${rows.partial ? `<p class="warn">${esc(t('add.partial', { n: good }))}</p>` : ''}
+      ${missing.length ? `<div class="missing"><p class="warn">${esc(t('add.missing', { list: missing.join(' ') }))}</p>
+        <button type="button" class="btn small" data-act="copy-missing">${esc(t('add.copyMissing'))}</button></div>` : ''}
       ${GROUPS.map(g => {
         const list = by(g); if (!list.length) return '';
         return `<div class="grp g-${g}"><h3>${esc(t('add.grp.' + g))} <span class="num">${list.length}</span></h3>

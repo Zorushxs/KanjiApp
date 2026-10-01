@@ -279,6 +279,8 @@ button.kchip { font-family: var(--jp); }
 .msgs { grid-column: 2; list-style: none; margin: 2px 0 0; padding: 0; font-size: 13px; }
 .msgs .e { color: var(--danger); } .msgs .w { color: var(--warn); }
 .ok-line { margin: 0 0 12px; color: var(--ok); font-weight: 600; }
+.missing { display: grid; justify-items: start; gap: 8px; margin: 6px 0 4px; }
+.missing .warn { margin: 0; }
 .note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 14.5px; }
 
 /* ---------- Practicar ---------- */
