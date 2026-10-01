@@ -70,7 +70,7 @@ const Peces = (() => {
       checked ? t(ver.key) : '',
     ].filter(Boolean).join(' · ');
     const boxes = [1, 2, 3, 4, 5].map(i => html`<i${i <= box ? html` class="f"` : ''}></i>`);
-    return html`<a class="tile${due ? ' due' : ''}" href="${Card.href(card.kanji)}" title="${title}">
+    return html`<a class="tile${due ? ' due' : ''}" href="${Card.href(card.kanji)}" title="${title}" data-k="${card.kanji}">
       ${checked ? html`<span class="tile-ver ver-${ver.cls}" aria-hidden="true">${ver.icon}</span>` : ''}
       ${kanji}
       <span class="tile-m">${meaning}</span>

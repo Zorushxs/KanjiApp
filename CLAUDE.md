@@ -5,7 +5,7 @@ Web per aprendre kanji i paraules en japonès, per a principiants. Les preferèn
 ## Tecnologia i convencions
 
 - HTML, CSS i JS sense dependències ni compilació, amb rutes relatives, pensat primer per al mòbil i amb tema clar i fosc.
-- **Cada canvi apuja `?v=N`** a totes les referències d'[index.html](index.html) amb `node tools/versio.js` (ara és `?v=17`). Si no, GitHub Pages serveix els fitxers vells.
+- **Cada canvi apuja `?v=N`** a totes les referències d'[index.html](index.html) amb `node tools/versio.js` (ara és `?v=20`). Si no, GitHub Pages serveix els fitxers vells.
 - **Interfície en ca/es/en**: tots els textos són a [js/i18n.js](js/i18n.js), en els tres idiomes (cadenes entre cometes simples i apòstrof tipogràfic ’). Els comentaris del codi són en català.
 - Són scripts clàssics, cadascun amb un IIFE que exposa un objecte global: `Prefs`, `I18n`/`t`, `U` (util), `Card`, `Peces`, `Almacen`, `Validar`, `Store`, `Prompt`, `Veu`, `Traces`, `Inici`, `Fitxa`, `Afegir`, `Practica`, `Calendari`, `App`. L'ordre de càrrega és el d'index.html.
 - **On va cada cosa**: `U` només té coses generals (DOM, HTML, dates, kana → rōmaji, icones, avisos). Les regles d'una fitxa (si és paraula, nivell, lectures principals, verificació) són a `Card` ([js/card.js](js/card.js)), sense HTML. Els trossos d'HTML que comparteixen les pantalles (rōmaji, lectures, botó de veu, rajola) són a `Peces` ([js/peces.js](js/peces.js)).

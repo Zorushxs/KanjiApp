@@ -6,7 +6,9 @@ const Inici = (() => {
     query: '',
     level: 'all',
     kinds: new Set(), // 'kanji' i/o 'word'; si no n'hi ha cap, es veuen tots dos
+    sorting: false, // mode «Reordenar» (només a l'ordinador): les fitxes es poden arrossegar
   };
+  let screen = null; // la pantalla pintada, per a les tecles
 
   // ---------- Cerca ----------
   const normalize = text => U.hira(String(text).toLowerCase());
@@ -57,7 +59,8 @@ const Inici = (() => {
         <div class="chips">${filterChips(levels, hasWords)}</div>
       </div>
       <div class="view-opts"><span>${t('home.show')}</span>
-        ${viewSwitch('meanings', t('home.showMeanings'))}${viewSwitch('romaji', t('home.showRomaji'))}</div>
+        ${viewSwitch('meanings', t('home.showMeanings'))}${viewSwitch('romaji', t('home.showRomaji'))}
+        ${canSort() ? sortButton() : ''}</div>
       <p class="found" aria-live="polite"></p>
       <div class="grid${Prefs.view('meanings') ? '' : ' hide-m'}"></div>`;
 
@@ -68,7 +71,10 @@ const Inici = (() => {
       if (list.length === all.length) found.textContent = '';
       else found.textContent = list.length ? t('home.count', { n: list.length, total: all.length }) : t('home.none');
     }
+    screen = root;
+    state.sorting = false;
     paintGrid();
+    if (canSort()) sortable(grid, paintGrid);
 
     root.querySelector('.search').oninput = e => {
       state.query = e.target.value;
@@ -88,6 +94,9 @@ const Inici = (() => {
         setPressed(chip, on);
         paintGrid();
       },
+      sort() {
+        setSorting(!state.sorting);
+      },
       pref(toggle) {
         if (toggle.dataset.pref === 'romaji') {
           Peces.setRomaji(!Prefs.view('romaji'));
@@ -97,6 +106,68 @@ const Inici = (() => {
         toggle.setAttribute('aria-checked', show);
         grid.classList.toggle('hide-m', !show);
       },
+    });
+  }
+
+  // ---------- Ordenar arrossegant ----------
+  // Només a l'ordinador (ratolí): al mòbil, arrossegar faria nosa per moure's per la pàgina.
+  const canSort = () => matchMedia('(hover: hover) and (pointer: fine)').matches;
+  // Botó «Reordenar [R]»: s'encén amb un clic o amb la tecla R (a l'esquerra del teclat, que el ratolí és a la dreta),
+  // i s'apaga igual o amb Esc.
+  const sortButton = () => html`<button type="button" class="tag tag-btn sort-btn" data-act="sort"
+    aria-pressed="${state.sorting}" title="${t('home.sortHint')}">${t('home.sort')} <kbd>R</kbd></button>`;
+  function setSorting(on) {
+    state.sorting = on;
+    screen.querySelector('.grid').classList.toggle('sortable', on);
+    screen.querySelector('.sort-btn').setAttribute('aria-pressed', on);
+    if (on) U.toast(t('home.sortHint'));
+  }
+  function key(e) {
+    if (!screen || !screen.querySelector('.sort-btn')) return;
+    const letter = e.key.toLowerCase();
+    if (letter === 'r' || (e.key === 'Escape' && state.sorting)) {
+      e.preventDefault();
+      setSorting(letter === 'r' ? !state.sorting : false);
+    }
+  }
+  // En mode «Reordenar», agafes una rajola (no se selecciona el text) i, mentre la mous, les altres es fan
+  // a lloc. En deixar-la anar es desa l'ordre; si la deixes fora de la graella (o prems Esc), tot torna
+  // com era. Un clic no obre la fitxa, perquè no hi entris sense voler.
+  function sortable(grid, repaint) {
+    let dragged = null, dropped = false;
+    grid.addEventListener('click', e => {
+      if (state.sorting && e.target.closest('.tile')) e.preventDefault();
+    });
+    grid.addEventListener('dragstart', e => {
+      if (!state.sorting) return;
+      dragged = e.target.closest('.tile');
+      if (!dragged) return;
+      dropped = false;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragged.dataset.k);
+      // La classe es posa després perquè la imatge que s'arrossega no surti transparent.
+      setTimeout(() => dragged && dragged.classList.add('dragging'));
+    });
+    grid.addEventListener('dragover', e => {
+      if (!dragged) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const target = e.target.closest('.tile');
+      if (!target || target === dragged) return;
+      const tiles = [...grid.children];
+      const after = tiles.indexOf(dragged) < tiles.indexOf(target);
+      target.insertAdjacentElement(after ? 'afterend' : 'beforebegin', dragged);
+    });
+    grid.addEventListener('drop', e => {
+      e.preventDefault();
+      dropped = true;
+    });
+    grid.addEventListener('dragend', () => {
+      if (!dragged) return;
+      dragged.classList.remove('dragging');
+      dragged = null;
+      if (!dropped) repaint();
+      else Store.reorder([...grid.children].map(tile => tile.dataset.k));
     });
   }
 
@@ -133,5 +204,5 @@ const Inici = (() => {
     <button type="button" class="switch" role="switch" aria-checked="${Prefs.view(key)}" data-act="pref" data-pref="${key}"><i></i></button>
     <span>${label}</span></label>`;
 
-  return { nav: 'home', render, visible };
+  return { nav: 'home', render, key, visible };
 })();

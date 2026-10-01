@@ -110,6 +110,39 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     $$('.chip').find(c => c.dataset.lv === 'all').click();
     ok(!W().__xss && !$('.tile img'), 'graella sense injecció');
 
+    // Ordenar arrossegant (a l'ordinador): una sola DataTransfer per a tot l'arrossegament, com al navegador
+    const order = () => $$('.tile').map(x => x.dataset.k).join('');
+    const drag = (from, to, cancel) => {
+      const dt = new DataTransfer(), ev = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+      ev(from, 'dragstart'); ev(to, 'dragover');
+      if (!cancel) ev(to, 'drop');
+      ev(from, 'dragend');
+    };
+    const tileOf = k => $(`.tile[data-k="${k}"]`);
+    const initial = order();
+    ok(/Reordenar.*R/.test($('.sort-btn').textContent) && $('.sort-btn').getAttribute('aria-pressed') === 'false', 'botó «Reordenar R» a l’ordinador');
+    ok(!$('.grid').classList.contains('sortable'), 'per defecte no s’ordena');
+    drag(tileOf('日'), tileOf('火'));
+    ok(order() === initial, 'sense el mode, arrossegar no canvia res: ' + order());
+    key('r');
+    ok($('.grid').classList.contains('sortable') && $('.sort-btn').getAttribute('aria-pressed') === 'true', 'tecla R → mode ordenar');
+    ok(W().getComputedStyle($('.tile-k')).userSelect === 'none', 'en mode ordenar, el text de les fitxes no se selecciona');
+    tileOf('日').click(); await sleep(100);
+    ok(W().location.hash === '#/' && $('.grid'), 'en mode ordenar, un clic no obre la fitxa');
+    drag(tileOf('日'), tileOf('火'));
+    const storeOrder = () => G('Store').kanji.map(c => c.kanji).join('');
+    ok(order() === '月火日水人木' && storeOrder() === '月火日水人木', 'arrossegar 日 sobre 火 → ' + order() + ' / ' + storeOrder());
+    drag(tileOf('人'), tileOf('月'), true);
+    ok(order() === '月火日水人木' && storeOrder() === '月火日水人木', 'arrossegar i cancel·lar → no canvia res: ' + order());
+    drag(tileOf('日'), tileOf('月'));
+    ok(order() === initial && storeOrder() === initial, 'tornar-lo a lloc: ' + order());
+    key('Escape');
+    ok(!$('.grid').classList.contains('sortable') && $('.sort-btn').getAttribute('aria-pressed') === 'false', 'Esc → surt del mode');
+    $('.sort-btn').click();
+    ok($('.grid').classList.contains('sortable'), 'el botó també l’encén');
+    $('.sort-btn').click();
+    ok(!$('.grid').classList.contains('sortable'), 'i l’apaga');
+
     // Fitxa
     $$('.tile')[0].click();
     await until(() => $('.hero-k'));

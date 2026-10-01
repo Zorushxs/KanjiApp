@@ -89,6 +89,16 @@ ok(Store.kanji.length === 1, 'norm: treu duplicats i invàlids');
 const p = Store.prog('日');
 ok(p.box === 5 && p.due === today && p.seen === 0 && Store.prog('abc') === null, 'norm: progrés netejat ' + JSON.stringify(p));
 
+// Ordenar: amb filtre, només es mouen entre els llocs que ocupaven
+Store.load({ kanji: ['日', '月', '火', '水', '木'].map(k => ({ ...good, kanji: k })), progress: { '月': { box: 2 } } });
+const chars = () => Store.kanji.map(c => c.kanji).join('');
+Store.reorder(['月', '日', '火', '水', '木']);
+ok(chars() === '月日火水木' && Store.prog('月').box === 2, 'reorder: tota la llista, progrés intacte');
+Store.reorder(['木', '日', '火']);
+ok(chars() === '月木日水火', 'reorder amb filtre (日火木 → 木日火): ' + chars());
+Store.reorder(['日', 'zz']);
+ok(chars() === '月木日水火', 'reorder amb una fitxa que no hi és → no fa res');
+
 const pr = Prompt.cards(['日', '月']);
 ok(pr.includes('these kanji: 日、月') && pr.includes('```json') && !pr.includes('{{KANJI}}'), 'prompt amb els kanji i el bloc ```json');
 ok(t('add.apply', { n: 3 }) === 'Desar 3 kanji', 'i18n ca amb variables');

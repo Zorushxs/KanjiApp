@@ -247,6 +247,19 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
   transition: border-color .12s, transform .12s;
 }
 .tile:hover { border-color: var(--accent); transform: translateY(-1px); }
+/* Ordenar arrossegant (només a l'ordinador): botó «Reordenar [R]» a la dreta de «Mostrar». En mode ordenar,
+   les rajoles tenen la vora discontínua, el text no es pot seleccionar i la que mous queda com un forat. */
+.view-opts .sort-btn { margin-left: auto; color: var(--ink); font-size: 14px; }
+.sort-btn kbd {
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font: 700 11px/1.4 var(--sans);
+  opacity: .7;
+}
+.grid.sortable .tile { cursor: grab; user-select: none; -webkit-user-select: none; border-style: dashed; }
+.grid.sortable .tile.dragging { opacity: .35; border-style: dashed; border-color: var(--accent); transform: none; }
 .tile-k { font: 400 46px/1.15 var(--jp-k); }
 /* Paraules: com més llargues, més petites, perquè hi càpiguen. */
 .tile-k.w2, .tile-k.w3, .tile-k.w4 {

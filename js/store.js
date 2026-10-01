@@ -130,6 +130,17 @@ const Store = (() => {
       card.verified = Card.VERIFIED.includes(verified) ? verified : false;
       persist();
     },
+    // Nou ordre per a les fitxes de la llista (arrossegant-les a l'inici). Si hi ha un filtre, només es
+    // mouen entre els llocs que ocupaven: les que no es veuen es queden on eren.
+    reorder(order) {
+      const moving = new Set(order);
+      const slots = data.kanji.map((card, i) => (moving.has(card.kanji) ? i : -1)).filter(i => i >= 0);
+      if (slots.length !== order.length) return;
+      const cards = order.map(ch => data.kanji[findIndex(ch)]);
+      if (slots.every((slot, n) => data.kanji[slot] === cards[n])) return;
+      slots.forEach((slot, n) => { data.kanji[slot] = cards[n]; });
+      persist();
+    },
     remove(ch) {
       data.kanji = data.kanji.filter(card => card.kanji !== ch);
       delete data.progress[ch];
