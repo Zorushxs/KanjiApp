@@ -59,13 +59,19 @@ const Store = (() => {
       let added = 0, updated = 0;
       list.forEach(k => {
         const i = data.kanji.findIndex(x => x.kanji === k.kanji);
-        if (i < 0) { data.kanji.push(k); added++; } else { data.kanji[i] = k; updated++; }
+        if (i < 0) { data.kanji.push(k); added++; return; }
+        // Si les lectures principals (una o dues) les havies triat tu i encara hi són, es queden les teves.
+        const old = data.kanji[i], kept = old.mainByUser ? Validar.keptMains(old, k) : [];
+        if (kept.length) { k.reading = kept[0]; k.reading2 = kept[1] || ''; k.mainByUser = true; }
+        data.kanji[i] = k; updated++;
       });
       if (added + updated) persist();
       return { added, updated };
     },
     // Verificació: false (per verificar) · true (verificat) · 'error' (té errors).
     setVerified(ch, v) { const k = data.kanji.find(x => x.kanji === ch); if (k) { k.verified = Validar.VERIFIED.includes(v) ? v : false; persist(); } },
+    // Correccions fetes a mà des de la fitxa: se substitueix el contingut i el progrés no es toca.
+    update(ch, k) { const i = data.kanji.findIndex(x => x.kanji === ch); if (i >= 0) { data.kanji[i] = k; persist(); } },
     remove(ch) { data.kanji = data.kanji.filter(k => k.kanji !== ch); delete data.progress[ch]; persist(); },
     // Dies fins al proper repàs si respons g; null si no canviaria res (repàs extra encertat o dubtós).
     nextDays(ch, g) { const p = data.progress[ch]; return doneToday(p) && g !== 'no' ? null : DAYS[nextBox(p, g)]; },

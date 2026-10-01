@@ -18,7 +18,9 @@ Si regeneres un kanji que ja tens, se'n substitueix el contingut i se'n conserva
 
 La graella té filtres per nivell (N5, N4…) i per tipus (**Kanji** o **Paraules**; sense cap, es veuen tots dos). Amb els interruptors de **Mostrar** pots amagar els significats de sota de cada fitxa (per provar-te) i el rōmaji de tota l'app. Es recorden en aquest navegador.
 
-A la fitxa d'un kanji passes a l'anterior o la següent amb les fletxes (també les del teclat) i, al mòbil, lliscant el dit cap a la dreta o cap a l'esquerra.
+A la fitxa d'un kanji passes a l'anterior o la següent amb les fletxes (també les del teclat) i, al mòbil, lliscant el dit cap a la dreta o cap a l'esquerra. A l'ordinador, **V** la marca com a verificada i **E** com a «té errors» (tornant-la a prémer, es desfà): amb la mà esquerra marques i amb la dreta passes de fitxa.
+
+Amb **✎ Editar** (a baix de la fitxa) corregeixes els textos de l'idioma que tinguis posat i tries la **lectura principal** (la que t'ensenya el teu llibre). Si n'hi ha dues de molt fetes servir, com 七 (しち / なな), en pots triar dues: el número 1 o 2 diu en quin ordre es mostren i es diuen. D'una paraula, pots escriure-hi una segona lectura opcional. En desar, et quedes a la mateixa fitxa; el progrés i la verificació no canvien. Si després regeneres la fitxa amb Claude, les lectures principals que has triat es mantenen (si encara hi són), però les correccions de text es perden: la previsualització t'ho avisa.
 
 ## Pràctica i calendari
 
@@ -41,7 +43,7 @@ Tot es desa en un JSON: el tries amb **Crear arxiu / Obrir existent** (Chrome i 
 
 `last` és l'últim dia que l'has practicat, i `history`, quantes respostes has donat cada dia (per al calendari).
 
-El format de cada fitxa és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. Una fitxa pot ser un kanji sol o una **paraula**: llavors `kanji` porta la paraula sencera (学校, 食べる, じゃがいも), `onyomi` i `kunyomi` van buits, `strokes` és `null` i `reading` és com es llegeix tota la paraula. `reading` és la lectura que s'aprèn primer (一 → いち) i `sentence.romaji`, la frase en rōmaji; el rōmaji de les paraules i lectures el calcula l'app a partir del kana. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors).
+El format de cada fitxa és el que defineix el prompt de [js/prompt.js](js/prompt.js), amb els textos en `ca`, `es` i `en`. Una fitxa pot ser un kanji sol o una **paraula**: llavors `kanji` porta la paraula sencera (学校, 食べる, じゃがいも), `onyomi` i `kunyomi` van buits, `strokes` és `null` i `reading` és com es llegeix tota la paraula. `reading` és la lectura que s'aprèn primer (一 → いち); `reading2`, una segona lectura principal opcional (七: しち i なな) que només poses tu, des de la fitxa; i `sentence.romaji`, la frase en rōmaji; el rōmaji de les paraules i lectures el calcula l'app a partir del kana. El camp `verified` el canvies tu des de la fitxa: `false` (per verificar), `true` (verificat) o `"error"` (té errors). `edited` diu si l'has corregida tu i `mainByUser`, si les lectures principals les has triat tu.
 
 ## Veu
 

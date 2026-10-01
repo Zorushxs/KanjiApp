@@ -51,8 +51,12 @@ const U = (() => {
   const ro = text => (text ? `<span class="ro" lang="ja-Latn">${esc(romaji(String(text).replace(/\./g, '')))}</span>` : '');
   // Una llista de lectures en un sol bloc de rōmaji (així, si l'amagues, no hi queden comes soltes).
   const roList = arr => (arr.length ? `<span class="ro" lang="ja-Latn">${arr.map(r => esc(romaji(String(r).replace(/\./g, '')))).join(', ')}</span>` : '');
-  // És la lectura principal del kanji (camp "reading")? Val la paraula sencera (たべる) o només l'arrel (た).
-  const isMain = (k, r) => !!k.reading && [plain(r), String(r).split('.')[0].replace(/-/g, '')].some(x => hira(x) === k.reading);
+  // Les lectures principals d'una fitxa: la primera i, si l'has triada, la segona (七: しち / なな).
+  const mains = k => [k.reading, k.reading2].filter(Boolean);
+  // La lectura principal en kana amb el seu rōmaji; si n'hi ha dues, «しち shichi / なな nana».
+  const mainHtml = k => mains(k).map(r => `<span lang="ja">${esc(r)}</span> ${ro(r)}`).join('<span class="sep"> / </span>');
+  // És una lectura principal (camps "reading" i "reading2")? Val la paraula sencera (たべる) o només l'arrel (た).
+  const isMain = (k, r) => [plain(r), String(r).split('.')[0].replace(/-/g, '')].some(x => mains(k).includes(hira(x)));
   // Kun'yomi amb l'okurigana (el que va després del punt) més clar.
   const kun = r => { const [a, b] = String(r).split('.'); return esc(a) + (b ? `<span class="oku">${esc(b)}</span>` : ''); };
   // Ressalta el kanji dins d'una paraula o frase. ch sempre és un kanji validat, no cal escapar-lo.
@@ -108,5 +112,5 @@ const U = (() => {
     const el = $('#toast'); el.textContent = msg; el.dataset.kind = kind || ''; el.hidden = false;
     clearTimeout(tt); tt = setTimeout(() => { el.hidden = true; }, Math.max(3500, msg.length * 60)); // els llargs, més estona
   }
-  return { $, esc, today, addDays, fmtDate, hira, plain, romaji, ro, roList, isMain, isWord, size, pref, setRomaji, romajiBtn, kun, mark, jisho, kanjiHref, shuffle, ICON, ver, say, toast };
+  return { $, esc, today, addDays, fmtDate, hira, plain, romaji, ro, roList, mains, mainHtml, isMain, isWord, size, pref, setRomaji, romajiBtn, kun, mark, jisho, kanjiHref, shuffle, ICON, ver, say, toast };
 })();

@@ -52,6 +52,7 @@ const Validar = (() => {
       onyomi: words(o.onyomi, 20, n).map(r => r.replace(/\s/g, '')),
       kunyomi: words(o.kunyomi, 20, n).map(r => r.replace(/\s/g, '')),
       reading: str(o.reading, 20, n).replace(/\s/g, ''), // la lectura que s'aprèn primer (一 → いち)
+      reading2: str(o.reading2, 20, n).replace(/\s/g, ''), // una segona lectura principal, opcional i només triada per tu (七: しち / なな)
       strokes: int(o.strokes, 1, 64),
       jlpt: int(o.jlpt, 1, 5),
       emoji: str(o.emoji, 64),
@@ -63,15 +64,25 @@ const Validar = (() => {
       sentence: { jp: str(s.jp, 150, n), reading: str(s.reading, 250, n), romaji: str(s.romaji, 300, n), meaning: pair(s.meaning, 250, n) },
       trivia: pair(o.trivia, LONG, n),
       verified: VERIFIED.includes(o.verified) ? o.verified : false,
+      edited: o.edited === true, // l'has corregida tu des de la fitxa
+      mainByUser: o.mainByUser === true, // la lectura principal l'has triada tu
     };
   }
+  // Totes les lectures d'un kanji tal com poden ser la principal: ニチ → にち, た.べる → たべる i た, -び → び.
+  const readings = k => [...k.onyomi, ...k.kunyomi].flatMap(r => [U.plain(r), r.split('.')[0].replace(/-/g, '')]).map(U.hira);
+  // En regenerar: de les lectures principals que havies triat (una o dues), les que encara hi són.
+  // D'una paraula, la lectura és la nova i es conserva la segona que hi havies posat (si no és la mateixa).
+  const keptMains = (old, k) => (isWord(k.kanji)
+    ? (k.reading && old.reading2 && old.reading2 !== k.reading ? [k.reading, old.reading2] : [])
+    : [old.reading, old.reading2].filter(r => r && readings(k).includes(r)));
+  const isKana = s => READ.test(s);
 
   // Revisió estricta d'un element que ve de la IA: errors (no es desa) i avisos (es desa igualment).
   function check(raw) {
     const n = notes(), errors = [];
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { item: null, kanji: '', errors: [{ k: 'val.notObject' }], warnings: [] };
     const k = coerce(raw, n);
-    k.verified = false; // només el marques tu, des de la fitxa
+    k.verified = false; k.edited = false; k.mainByUser = false; k.reading2 = ''; // això només ho poses tu, des de la fitxa
     // Una fitxa és un kanji sol o una paraula (学校, 食べる, じゃがいも): les paraules no tenen on/kun ni traços.
     const word = isWord(k.kanji);
     if (!isCard(k.kanji)) errors.push({ k: 'val.kanji', p: { v: k.kanji || '—' } });
@@ -102,8 +113,7 @@ const Validar = (() => {
     else if (!READ.test(k.reading)) { n.add('val.reading', { v: k.reading }); k.reading = ''; }
     else {
       k.reading = U.hira(k.reading);
-      const all = [...k.onyomi, ...k.kunyomi].flatMap(r => [U.plain(r), r.split('.')[0].replace(/-/g, '')]).map(U.hira);
-      if (!all.includes(k.reading)) n.add('val.readingNotListed', { v: k.reading });
+      if (!readings(k).includes(k.reading)) n.add('val.readingNotListed', { v: k.reading });
     }
 
     const texts = [k.mnemonic, k.origin, k.trivia, k.sentence.meaning, ...k.examples.map(e => e.meaning)];
@@ -181,10 +191,18 @@ const Validar = (() => {
       if (!r.item) { r.status = 'err'; return; }
       if (last.get(r.item.kanji) !== i) { r.status = 'err'; r.item = null; r.errors.push({ k: 'val.dup' }); return; }
       const old = get(r.item.kanji);
-      r.status = !old ? 'new' : same(old, r.item) ? 'same' : 'upd';
+      // Es compara amb el que quedaria en desar-la: les lectures principals que havies triat es mantenen.
+      const kept = old && old.mainByUser ? keptMains(old, r.item) : [];
+      const merged = kept.length ? { ...r.item, reading: kept[0], reading2: kept[1] || '', mainByUser: true } : r.item;
+      r.status = !old ? 'new' : same(old, merged) ? 'same' : 'upd';
       if (r.status === 'upd' && old.verified === true) r.warnings.push({ k: 'add.loseVerified' });
+      if (r.status === 'upd' && old.edited) r.warnings.push({ k: 'add.loseEdits' });
+      if (r.status === 'upd' && kept.length) {
+        r.warnings.push(isWord(r.item.kanji) ? { k: 'add.keepsReading2', p: { v: kept[1] } }
+          : { k: kept.length > 1 ? 'add.keepsMains' : 'add.keepsMain', p: { v: kept.join(' / ') } });
+      }
     });
     return rows;
   }
-  return { coerce, check, extract, review, note, isCard, isWord, VERIFIED };
+  return { coerce, check, extract, review, note, isCard, isWord, isKana, readings, keptMains, VERIFIED };
 })();

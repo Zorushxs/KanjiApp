@@ -112,7 +112,7 @@ const Practica = (() => {
   }
   // La lectura que s'aprèn primer (camp "reading"), amb el rōmaji i la veu. Les fitxes antigues no en tenen.
   const mainLine = k => (k.reading
-    ? `<div class="ans-main"><span lang="ja">${esc(k.reading)}</span>${U.ro(k.reading)}${U.say(k.reading, t('card.listenMain'))}</div>` : '');
+    ? `<div class="ans-main">${U.mainHtml(k)}${U.say(U.mains(k).join('、'), t('card.listenMain'))}</div>` : '');
   // Revers: kanji → significat/lectura mostra el significat; significat → kanji, el kanji. Totes dues, les lectures.
   function back(k) {
     const means = esc(I18n.list(k.meanings).join(' · ')), emoji = k.emoji ? ` <span aria-hidden="true">${esc(k.emoji)}</span>` : '';
