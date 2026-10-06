@@ -131,9 +131,10 @@ const Store = (() => {
 
   // ---------- Arbre d'etiquetes ----------
   const findTag = id => data.tags.find(tag => tag.id === id) || null;
-  // Per ordre alfabètic, amb els números en ordre (2 abans que 10) i sense mirar majúscules ni accents.
-  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-  const childrenOf = parent => data.tags.filter(tag => tag.parent === parent).sort(byName);
+  // Mateix nom sense mirar majúscules ni accents (Números = numeros).
+  const sameName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }) === 0;
+  // Les de dins d'una etiqueta, en l'ordre que has triat (el de la llista "tags"; les noves, al final).
+  const childrenOf = parent => data.tags.filter(tag => tag.parent === parent);
   // L'etiqueta i totes les de dins (i les de dins d'aquestes…).
   function branchOf(id) {
     if (!findTag(id)) return [];
@@ -143,7 +144,7 @@ const Store = (() => {
   }
   // Ja n'hi ha una amb aquest nom (sense mirar majúscules ni accents) dins del mateix pare?
   const nameTaken = (name, parent, exceptId) => childrenOf(parent)
-    .some(tag => tag.id !== exceptId && byName(tag, { name }) === 0);
+    .some(tag => tag.id !== exceptId && sameName(tag.name, name));
   const nextTagId = () => 't' + (Math.max(0, ...data.tags.map(tag => +tag.id.slice(1))) + 1);
 
   return {
@@ -216,7 +217,7 @@ const Store = (() => {
     // ---------- Etiquetes ----------
     get tags() { return data.tags; },
     tag: findTag,
-    // Les de dins d'una etiqueta ('' = les principals), per ordre alfabètic.
+    // Les de dins d'una etiqueta ('' = les principals), en l'ordre que has triat.
     tagChildren: childrenOf,
     tagBranch: branchOf,
     // De la principal fins a aquesta: [Temps, Mesos].
@@ -270,9 +271,24 @@ const Store = (() => {
       if (!tag) return { error: 'tags.notFound' };
       if (parent && (!findTag(parent) || branchOf(id).includes(parent))) return { error: 'tags.loop' };
       if (nameTaken(tag.name, parent, id)) return { error: 'tags.taken' };
+      if (tag.parent !== parent) { // al lloc nou, va al final
+        data.tags.splice(data.tags.indexOf(tag), 1);
+        data.tags.push(tag);
+      }
       tag.parent = parent;
       persist();
       return {};
+    },
+    // Puja (step -1) o baixa (step 1) una etiqueta entre les que són al mateix lloc.
+    shiftTag(id, step) {
+      const tag = findTag(id);
+      if (!tag) return;
+      const siblings = childrenOf(tag.parent), other = siblings[siblings.indexOf(tag) + step];
+      if (!other) return;
+      const a = data.tags.indexOf(tag), b = data.tags.indexOf(other);
+      data.tags[a] = other;
+      data.tags[b] = tag;
+      persist();
     },
     // Esborra l'etiqueta i les de dins, i les treu de les fitxes (les fitxes no s'esborren).
     removeTag(id) {

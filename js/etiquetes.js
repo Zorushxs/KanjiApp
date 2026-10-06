@@ -1,8 +1,8 @@
 // Etiquetes per organitzar les fitxes (Números, Temps › Mesos…). Una etiqueta pot anar dins d'una altra, tants
 // nivells com vulguis, i una fitxa en pot tenir tantes com vulguis. Dues pantalles:
-// - #/etiquetes: totes en arbre i el formulari per crear-ne;
-// - #/etiquetes/<id>: una etiqueta. Toques les fitxes per posar-los-la o treure-la, i en pots crear de dins,
-//   canviar-ne el nom, moure-la dins d'una altra o esborrar-la.
+// - #/etiquetes: totes en arbre (amb ↑ ↓ per canviar-ne l'ordre) i el formulari per crear-ne;
+// - #/etiquetes/<id>: una etiqueta, amb l'arbre sencer a dalt. En pots crear de dins, canviar-ne el nom, moure-la
+//   dins d'una altra o esborrar-la, i toques les fitxes per posar-los-la o treure-la.
 const Etiquetes = (() => {
   const { html } = U;
   const state = {
@@ -44,28 +44,66 @@ const Etiquetes = (() => {
       ${backBar(t('card.back'))}
       <h1 class="h">${t('tags.title')}</h1>
       <section class="panel tags-panel"><h2>${t('tags.new')}</h2>${createForm('')}</section>
-      <section class="panel tags-panel"><h2>${t('tags.all')}</h2>${untaggedRow()}${treeList(Store.tagTree(), 0)}</section>`;
-    U.onActions(root, {
-      back,
+      ${treePanel('')}`;
+    U.onActions(root, { back, ...treeActions(root) });
+  }
+
+  // ---------- Arbre ----------
+  // Totes les etiquetes, també dins d'una etiqueta (amb aquesta marcada), per veure sempre on ets.
+  // current: l'etiqueta oberta ('' a la llista); dins d'una etiqueta, a sota hi ha el formulari per crear-ne a dins.
+  function treePanel(current) {
+    return html`<section class="panel tags-panel"><h2>${t('tags.all')}</h2>${untaggedRow()}${treeList(current)}${
+      current ? createForm(current) : ''}</section>`;
+  }
+  // Què fan els botons de l'arbre: «Sense etiqueta», anar a una etiqueta i canviar l'ordre (↑ ↓).
+  function treeActions(root) {
+    const shift = (button, step) => {
+      const id = button.dataset.tag, act = button.dataset.act;
+      Store.shiftTag(id, step);
+      render(root, state.current);
+      const same = root.querySelector(`[data-act="${act}"][data-tag="${id}"]`);
+      const other = root.querySelector(`[data-act="${act === 'up' ? 'down' : 'up'}"][data-tag="${id}"]`);
+      (same && !same.disabled ? same : other).focus();
+    };
+    return {
       untagged(link, e) {
         e.preventDefault();
         Inici.showTag(Inici.UNTAGGED);
       },
-    });
+      // D'una etiqueta a una altra sense omplir l'historial: «enrere» surt de les etiquetes.
+      go(link, e) {
+        if (!state.current) return;
+        e.preventDefault();
+        App.replace(link.getAttribute('href'));
+      },
+      up: button => shift(button, -1),
+      down: button => shift(button, 1),
+    };
   }
   // «Sense etiqueta»: automàtica, amb les fitxes que no en tenen cap. Va la primera i porta a l'inici amb aquest filtre.
   function untaggedRow() {
     const n = Store.kanji.filter(card => !Store.cardTags(card.kanji).length).length;
     return html`<ul class="tags-tree tags-untagged"><li><a href="#/" data-act="untagged">
-        <span>${t('tags.untagged')} <em>${t('tags.auto')}</em></span><small>${n}</small></a></li></ul>`;
+        <span>${t('tags.untagged')} <em>${t('tags.auto')}</em></span><small>${n}</small></a>
+        <span class="tags-order" aria-hidden="true"></span></li></ul>`;
   }
 
-  // Arbre d'etiquetes: cada una amb quantes fitxes té (comptant les de dins). base: fondària de la primera.
-  function treeList(items, base) {
-    if (!items.length) return html`<p class="hint">${base ? t('tags.subNone') : t('tags.none')}</p>`;
-    const item = ({ tag, depth }) => html`<li style="--depth: ${depth - base}"><a href="#/etiquetes/${tag.id}">
-        <span>${tag.name}</span><small>${Store.cardsInTag(tag.id).length}</small></a></li>`;
-    return html`<ul class="tags-tree">${items.map(item)}</ul>`;
+  // Cada etiqueta amb quantes fitxes té (comptant les de dins) i els botons ↑ ↓ per canviar-ne l'ordre entre
+  // les que són al mateix lloc. La primera no pot pujar i l'última no pot baixar.
+  function treeList(current) {
+    const tree = Store.tagTree();
+    if (!tree.length) return html`<p class="hint">${t('tags.none')}</p>`;
+    const item = ({ tag, depth }) => {
+      const siblings = Store.tagChildren(tag.parent), i = siblings.indexOf(tag), on = tag.id === current;
+      const move = (act, icon, label, off) => html`<button type="button" class="tags-move" data-act="${act}" data-tag="${tag.id}"
+        title="${label}" aria-label="${label} · ${tag.name}"${off ? html` disabled` : ''}>${icon}</button>`;
+      return html`<li style="--depth: ${depth}"${on ? html` class="on"` : ''}>
+          <a href="#/etiquetes/${tag.id}" data-act="go"${on ? html` aria-current="page"` : ''}><span>${tag.name}</span>
+            <small>${Store.cardsInTag(tag.id).length}</small></a>
+          <span class="tags-order">${move('up', '↑', t('tags.up'), i === 0)}${move('down', '↓', t('tags.down'), i === siblings.length - 1)}</span>
+        </li>`;
+    };
+    return html`<ul class="tags-tree">${tree.map(item)}</ul>`;
   }
 
   // Crear: a la llista, amb el desplegable «Dins de»; dins d'una etiqueta, a dins d'aquesta.
@@ -92,7 +130,7 @@ const Etiquetes = (() => {
       ${backBar(t('tags.title'))}
       ${above.length ? html`<p class="tags-crumbs">${crumbs}</p>` : ''}
       <h1 class="h">${tag.name}</h1>
-      <section class="panel tags-panel"><h2>${t('tags.sub')}</h2>${treeList(subtree(tag.id), 1 + above.length)}${createForm(tag.id)}</section>
+      ${treePanel(tag.id)}
       ${editPanel(tag)}
       ${cardsPanel()}`;
     paintCards(root, tag);
@@ -102,6 +140,7 @@ const Etiquetes = (() => {
     };
     U.onActions(root, {
       back,
+      ...treeActions(root),
       pick(tile) {
         const on = tile.getAttribute('aria-pressed') !== 'true';
         Store.setCardTag(tile.dataset.k, tag.id, on);
@@ -117,12 +156,6 @@ const Etiquetes = (() => {
         App.replace(tag.parent ? '#/etiquetes/' + tag.parent : '#/etiquetes');
       },
     });
-  }
-  // Les de dins d'una etiqueta, en arbre (sense ella).
-  function subtree(id) {
-    const tree = Store.tagTree(), i = tree.findIndex(item => item.tag.id === id), items = [];
-    for (let j = i + 1; j < tree.length && tree[j].depth > tree[i].depth; j++) items.push(tree[j]);
-    return items;
   }
 
   // Totes les fitxes; les que tenen l'etiqueta es veuen premudes i un toc la posa o la treu.

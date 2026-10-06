@@ -839,7 +839,22 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .tags-crumbs a { color: inherit; }
 .tags-panel + .tags-panel { margin-top: 12px; }
 .tags-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.tags-tree li { margin-left: calc(var(--depth, 0) * 20px); }
+.tags-tree li { display: flex; align-items: center; gap: 6px; margin-left: calc(var(--depth, 0) * 20px); }
+.tags-tree li > a { flex: 1; min-width: 0; }
+.tags-tree li.on > a { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Botons ↑ ↓ per canviar l'ordre; «Sense etiqueta» en té un buit de la mateixa amplada perquè els números quedin en columna. */
+.tags-order { flex: none; display: flex; gap: 4px; width: 72px; justify-content: flex-end; }
+.tags-move {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  font-size: 15px;
+  line-height: 1;
+}
+.tags-move:hover:not(:disabled) { border-color: var(--mute); }
+.tags-move:disabled { opacity: .3; cursor: default; }
 .tags-tree li + li { border-top: 1px solid var(--line); padding-top: 4px; }
 .tags-tree a {
   display: flex;

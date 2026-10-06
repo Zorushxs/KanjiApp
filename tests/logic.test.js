@@ -304,7 +304,15 @@ const temps = Store.addTag('  Temps ').id, mesos = Store.addTag('Mesos', temps).
 ok(Store.tag(temps).name === 'Temps' && Store.tag(mesos).parent === temps, 'addTag: nom net i dins d’una altra');
 ok(Store.addTag('numeros').error === 'tags.taken' && Store.addTag('   ').error === 'tags.empty', 'addTag: repetit (sense accents ni majúscules) i buit');
 ok(!Store.addTag('Mesos').error, 'el mateix nom en un altre lloc sí que es pot');
-ok(Store.tagTree().map(x => x.tag.name + x.depth).join() === 'Mesos0,Números0,Temps0,Mesos1', 'tagTree: alfabètic i en arbre');
+ok(Store.tagTree().map(x => x.tag.name + x.depth).join() === 'Temps0,Mesos1,Números0,Mesos0', 'tagTree: en arbre i per ordre de creació');
+const rootNames = () => Store.tagChildren('').map(x => x.name).join();
+Store.shiftTag(Store.tagChildren('')[2].id, -1);
+ok(rootNames() === 'Temps,Mesos,Números', 'shiftTag: pujar');
+Store.shiftTag(Store.tagChildren('')[0].id, -1); Store.shiftTag(Store.tagChildren('')[2].id, 1);
+ok(rootNames() === 'Temps,Mesos,Números', 'shiftTag: la primera no puja i l’última no baixa');
+Store.shiftTag(temps, 1);
+ok(rootNames() === 'Mesos,Temps,Números' && Store.tagTree().map(x => x.tag.name).join() === 'Mesos,Temps,Mesos,Números', 'shiftTag: baixar, amb les de dins');
+Store.shiftTag(temps, -1);
 ok(Store.tagLabel(mesos) === 'Temps › Mesos' && Store.tagBranch(temps).join() === [temps, mesos].join(), 'tagLabel i tagBranch');
 Store.setCardTag('一', nums, true); Store.setCardTag('二', nums, true); Store.setCardTag('月', mesos, true);
 Store.setCardTag('月', nums, true); Store.setCardTag('月', nums, false); Store.setCardTag('zz', nums, true);
@@ -314,6 +322,7 @@ Store.merge([{ ...Store.get('月'), mnemonic: { ca: 'Nova', es: '', en: '' } }])
 ok(Store.cardTags('月').join() === mesos, 'regenerar una fitxa no li treu les etiquetes');
 ok(Store.moveTag(temps, mesos).error === 'tags.loop' && Store.moveTag(temps, temps).error === 'tags.loop', 'moveTag: mai dins de les seves');
 ok(!Store.moveTag(nums, temps).error && Store.tagLabel(nums) === 'Temps › Números', 'moveTag: dins d’una altra');
+ok(Store.tagChildren(temps).map(x => x.name).join() === 'Mesos,Números', 'moveTag: al lloc nou va al final');
 ok(Store.renameTag(nums, 'Mesos').error === 'tags.taken' && !Store.renameTag(nums, 'Nombres').error, 'renameTag');
 Store.remove('二');
 ok(!('二' in Store.snapshot().cardTags), 'esborrar una fitxa li treu les etiquetes');

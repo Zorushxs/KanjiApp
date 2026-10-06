@@ -602,11 +602,22 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     await create('Temps'); await create('Números'); await create('temps');
     ok(S.tags.map(x => x.name).join() === 'Temps,Números' && /Ja hi ha una etiqueta/.test($('#toast').textContent), 'crear: dues principals, la repetida no');
     $$('.tags-tree a').find(a => a.textContent.includes('Temps')).click(); await sleep(150);
-    ok($('h1.h').textContent === 'Temps' && /No en té cap a dins/.test($('.tags-panel:nth-of-type(1)').textContent), 'pantalla d’una etiqueta');
+    const treeNames = () => $$('.tags-tree:not(.tags-untagged) li a span').map(x => x.textContent).join();
+    ok($('h1.h').textContent === 'Temps' && treeNames() === 'Temps,Números' && /Temps/.test($('.tags-tree li.on').textContent),
+      'pantalla d’una etiqueta: l’arbre sencer a dalt, amb aquesta marcada');
     await create('Mesos');
     const mesosId = S.tags.find(x => x.name === 'Mesos').id;
-    ok(S.tagLabel(mesosId) === 'Temps › Mesos' && $('.tags-tree a') && /Mesos/.test($('.tags-tree').textContent), 'crear a dins');
-    await go('#/etiquetes/' + mesosId);
+    ok(S.tagLabel(mesosId) === 'Temps › Mesos' && treeNames() === 'Temps,Mesos,Números', 'crear a dins: surt a l’arbre');
+    const moveBtn = (act, name) => $$(`.tags-tree [data-act="${act}"]`).find(b => b.closest('li').querySelector('span').textContent === name);
+    ok(moveBtn('up', 'Temps').disabled && moveBtn('down', 'Números').disabled && moveBtn('up', 'Mesos').disabled, 'la primera no puja i l’última no baixa');
+    moveBtn('up', 'Números').click(); await sleep(60);
+    ok(treeNames() === 'Números,Temps,Mesos' && S.tagChildren('').map(x => x.name).join() === 'Números,Temps'
+      && D().activeElement === moveBtn('down', 'Números'), '↑: Números puja (amb el focus al botó que encara es pot fer servir)');
+    moveBtn('down', 'Números').click(); await sleep(60);
+    ok(treeNames() === 'Temps,Mesos,Números' && $('h1.h').textContent === 'Temps', '↓: torna a baixar i segueixes a la mateixa etiqueta');
+    $$('.tags-tree li a').find(a => a.textContent.includes('Mesos')).click(); await sleep(150);
+    ok(W().location.hash === '#/etiquetes/' + mesosId && treeNames() === 'Temps,Mesos,Números' && /Mesos/.test($('.tags-tree li.on').textContent),
+      'des de l’arbre vas a una altra etiqueta i l’arbre hi segueix');
     ok(/Temps/.test($('.tags-crumbs').textContent) && $$('.tile-pick').length === S.kanji.length, 'camí i totes les fitxes per triar');
     const pickTile = ch => $$('.tile-pick').find(x => x.dataset.k === ch);
     pickTile('月').click(); pickTile('日').click(); await sleep(30);
@@ -619,7 +630,7 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     await go('#/');
     const tagChip = name => $$('.home-tags [data-act="tag"]').find(c => c.textContent === name);
     ok(tagChip('Temps') && tagChip('Números') && !tagChip('Mesos'), 'inici: les principals');
-    ok($$('.home-tags [data-act="tag"]').map(c => c.textContent).join() === 'Sense etiqueta,Números,Temps', 'inici: «Sense etiqueta» la primera');
+    ok($$('.home-tags [data-act="tag"]').map(c => c.textContent).join() === 'Sense etiqueta,Temps,Números', 'inici: «Sense etiqueta» la primera, i les altres en el teu ordre');
     tagChip('Temps').click(); await sleep(30);
     ok($$('.tile').map(x => x.dataset.k).join() === '月' && tagChip('Mesos') && $('.home-tags-sub'), 'Temps: inclou les de Mesos i obre la fila de dins');
     tagChip('Mesos').click(); await sleep(30);
@@ -640,7 +651,7 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     await go('#/k/' + encodeURIComponent('水'));
     ok(/no té cap etiqueta/.test($('.card-tags').textContent), 'fitxa sense etiquetes');
     $('[data-act="tags"]').click(); await sleep(30);
-    ok($$('.tag-pick').map(b => b.textContent).join() === 'Números,Temps,Mesos', 'fitxa: totes en arbre');
+    ok($$('.tag-pick').map(b => b.textContent).join() === 'Temps,Mesos,Números', 'fitxa: totes en arbre');
     $$('.tag-pick').find(b => b.textContent === 'Números').click(); await sleep(30);
     $('[data-act="tags"]').click(); await sleep(30);
     ok($('.card-tag-list') && $('.card-tag-list').textContent === 'Números', 'fitxa: posada i es veu en tancar');
