@@ -274,7 +274,14 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     // Pràctica
     await go('#/practica');
     ok(/0 per repassar · 6 nous/.test($('.big-line').textContent), 'preparació: ' + $('.big-line').textContent);
-    ok($$('.bx div').length === 6 && $('.bx .b0 b').textContent === '6', 'caixes: 6 nous');
+    ok($$('.bx button').length === 6 && $('.bx .b0 b').textContent === '6', 'caixes: 6 nous');
+    ok(!$('.bx-cards'), 'cap caixa oberta per defecte');
+    $('.bx .b0').click(); await sleep(50);
+    ok($$('.bx-cards .tile').length === 6 && $('.bx .b0').getAttribute('aria-pressed') === 'true', 'clic a «Nous»: es veuen les 6 fitxes');
+    $('.bx .b3').click(); await sleep(50);
+    ok(!$('.bx-cards') && $('.bx-empty') && $('.bx .b0').getAttribute('aria-pressed') === 'false', 'caixa 3 buida: avís i «Nous» es tanca');
+    $('.bx .b3').click(); await sleep(50);
+    ok(!$('.bx-cards') && !$('.bx-empty'), 'un altre clic a la mateixa caixa la tanca');
     $('input[name="size"][value="10"]').click(); await sleep(50);
     ok($('[data-act="start"]').textContent.includes('6'), 'botó: ' + $('[data-act="start"]').textContent);
     $('[data-act="start"]').click();

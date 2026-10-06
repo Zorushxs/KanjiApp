@@ -22,6 +22,7 @@ const Practica = (() => {
   // { free, mode, queue: [{ ch, rep }], i, flipped, res: { no, yes, doubt }, failed: [ch], done }
   // free: repàs lliure (no desa res) · rep: segona passada d'una fallada · i: posició a la cua.
   let session = null, root = null, screen = 'setup';
+  let openBox = null; // la caixa oberta a la preparació (se'n veuen les fitxes), o null
 
   // Les fitxes que entren segons els filtres de nivell i de tipus.
   const pool = () => Store.kanji.filter(card =>
@@ -71,8 +72,9 @@ const Practica = (() => {
       <h1 class="h">${t('pr.title')}</h1>
       <section class="panel">
         <p class="big-line">${t('pr.dueNew', { due, new: fresh }) + (options.again ? ' · ' + t('pr.todayCount', { n: today }) : '')}</p>
-        <div class="bx">${boxes.map((n, box) =>
-          html`<div class="b${box}"><b>${n}</b><span>${box ? t('pr.box', { n: box }) : t('pr.boxNew')}</span></div>`)}</div>
+        <div class="bx">${boxes.map((n, box) => html`<button type="button" class="b${box}" data-act="box" data-box="${box}"
+          aria-pressed="${openBox === box}"><b>${n}</b><span>${box ? t('pr.box', { n: box }) : t('pr.boxNew')}</span></button>`)}</div>
+        ${boxCards(cards, day)}
         <p class="hint">${t('pr.explain')}</p>
       </section>
       <section class="panel setup">
@@ -105,9 +107,23 @@ const Practica = (() => {
         setup();
         root.querySelector('.switch').focus();
       },
+      box(el) {
+        const box = +el.dataset.box;
+        openBox = openBox === box ? null : box;
+        setup();
+        root.querySelector(`.bx [data-box="${box}"]`).focus();
+      },
       start: () => start(false),
       free: () => start(true),
     });
+  }
+
+  // Les fitxes de la caixa oberta, amb les mateixes rajoles que l'inici.
+  function boxCards(cards, day) {
+    if (openBox === null) return '';
+    const inBox = cards.filter(card => boxOf(card.kanji) === openBox);
+    if (!inBox.length) return html`<p class="hint bx-empty">${t('pr.boxEmpty')}</p>`;
+    return html`<div class="grid bx-cards">${inBox.map(card => Peces.tile(card, day))}</div>`;
   }
 
   // Grups de botons d'opció: mode, quantes, nivell (si n'hi ha més d'un) i tipus (si tens paraules).

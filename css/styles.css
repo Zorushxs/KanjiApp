@@ -581,7 +581,15 @@ button.kchip { font-family: var(--jp); }
 /* ---------- Practicar ---------- */
 .big-line { margin: 0 0 12px; font: 600 18px/1.35 var(--serif); }
 .bx { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; text-align: center; }
-.bx div { padding: 8px 2px 7px; border-radius: 10px; background: var(--bg); border-top: 3px solid var(--line); }
+.bx button {
+  padding: 8px 2px 7px; border-radius: 10px; background: var(--bg); color: var(--ink);
+  border: 1px solid transparent; border-top: 3px solid var(--line); font: inherit; cursor: pointer;
+}
+.bx button[aria-pressed="true"] {
+  background: var(--accent-soft); border-left-color: var(--accent); border-right-color: var(--accent); border-bottom-color: var(--accent);
+}
+.bx-cards { margin-top: 10px; }
+.bx-empty { margin: 10px 0 0; text-align: center; }
 .bx .b1 { border-top-color: var(--b1); } .bx .b2 { border-top-color: var(--b2); } .bx .b3 { border-top-color: var(--b3); }
 .bx .b4 { border-top-color: var(--b4); } .bx .b5 { border-top-color: var(--b5); }
 .bx b { display: block; font: 700 20px/1.2 var(--serif); }
