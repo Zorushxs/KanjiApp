@@ -298,6 +298,38 @@ ok(Card.nextVerified(false) === true && Card.nextVerified(true) === 'error' && C
   && Card.verState('x').cls === 'pending', 'Card: estats de verificació');
 ok(Card.href('日') === '#/k/%E6%97%A5' && Card.jisho('学校').endsWith('%E5%AD%A6%E6%A0%A1'), 'Card.href i Card.jisho');
 
+// Etiquetes: arbre, fitxes, regenerar, moure, esborrar i netejar en carregar
+Store.load({ kanji: ['一', '二', '月', '火'].map(k => ({ ...good, kanji: k })) });
+const temps = Store.addTag('  Temps ').id, mesos = Store.addTag('Mesos', temps).id, nums = Store.addTag('Números').id;
+ok(Store.tag(temps).name === 'Temps' && Store.tag(mesos).parent === temps, 'addTag: nom net i dins d’una altra');
+ok(Store.addTag('numeros').error === 'tags.taken' && Store.addTag('   ').error === 'tags.empty', 'addTag: repetit (sense accents ni majúscules) i buit');
+ok(!Store.addTag('Mesos').error, 'el mateix nom en un altre lloc sí que es pot');
+ok(Store.tagTree().map(x => x.tag.name + x.depth).join() === 'Mesos0,Números0,Temps0,Mesos1', 'tagTree: alfabètic i en arbre');
+ok(Store.tagLabel(mesos) === 'Temps › Mesos' && Store.tagBranch(temps).join() === [temps, mesos].join(), 'tagLabel i tagBranch');
+Store.setCardTag('一', nums, true); Store.setCardTag('二', nums, true); Store.setCardTag('月', mesos, true);
+Store.setCardTag('月', nums, true); Store.setCardTag('月', nums, false); Store.setCardTag('zz', nums, true);
+ok(Store.cardTags('月').join() === mesos && Store.cardTags('zz').length === 0, 'setCardTag: posar, treure i fitxa que no existeix');
+ok(Store.cardsInTag(temps).map(c => c.kanji).join() === '月' && Store.cardsInTag(nums).length === 2, 'cardsInTag compta les de dins');
+Store.merge([{ ...Store.get('月'), mnemonic: { ca: 'Nova', es: '', en: '' } }]);
+ok(Store.cardTags('月').join() === mesos, 'regenerar una fitxa no li treu les etiquetes');
+ok(Store.moveTag(temps, mesos).error === 'tags.loop' && Store.moveTag(temps, temps).error === 'tags.loop', 'moveTag: mai dins de les seves');
+ok(!Store.moveTag(nums, temps).error && Store.tagLabel(nums) === 'Temps › Números', 'moveTag: dins d’una altra');
+ok(Store.renameTag(nums, 'Mesos').error === 'tags.taken' && !Store.renameTag(nums, 'Nombres').error, 'renameTag');
+Store.remove('二');
+ok(!('二' in Store.snapshot().cardTags), 'esborrar una fitxa li treu les etiquetes');
+Store.removeTag(temps);
+ok(Store.tags.length === 1 && !Object.keys(Store.snapshot().cardTags).length, 'removeTag: amb les de dins i fora de les fitxes');
+Store.load({
+  kanji: [good],
+  tags: [{ id: 't1', name: 'A', parent: 't2' }, { id: 't2', name: 'B', parent: 't1' }, { id: 't3', name: ' ', parent: '' },
+    { id: 'x', name: 'C' }, { id: 't4', name: 'D', parent: 't9' }, { id: 't1', name: 'E' }],
+  cardTags: { '日': ['t1', 't1', 't7'], '月': ['t2'] },
+});
+ok(Store.tags.map(x => x.id).join() === 't1,t2,t4' && Store.tags.every(x => !x.parent || Store.tag(x.parent)), 'norm: ids i noms vàlids, sense pares que no hi són');
+ok(Store.tagTree().length === 3, 'norm: sense cercles (A dins de B dins de A)');
+ok(JSON.stringify(Store.snapshot().cardTags) === '{"日":["t1"]}', 'norm: etiquetes de fitxes que existeixen, sense repetir');
+ok(Store.addTag('F').id === 't5', 'id nou: el següent al més alt');
+
 // Prefs: preferències del navegador
 Prefs.set('theme', 'dark');
 Prefs.set('practice', { size: 20 });

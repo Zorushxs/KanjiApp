@@ -587,6 +587,64 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     const v火 = S.get('火').verified; key('e'); await sleep(30);
     ok(S.get('火').verified === v火, 'mentre edites, les tecles no fan res');
     $('.edit-bar [data-act="cancel"]').click(); await sleep(40);
+
+    // ---- Etiquetes: crear-les en arbre, triar fitxes, filtrar i cercar a l'inici, fitxa i esborrar ----
+    await go('#/');
+    ok($('.home-tags .home-tags-edit') && !$('.home-tags [data-act="tag"]'), 'inici sense etiquetes: només l’enllaç per crear-ne');
+    ok(!$('.finder > .chips .home-tags-edit') && !$('.finder > .chips [data-act="tag"]'), 'les etiquetes van en una fila a part');
+    $('.home-tags-edit').click(); await sleep(150);
+    ok(W().location.hash === '#/etiquetes' && /Encara no tens cap etiqueta/.test($('.tags-panel:last-child').textContent), 'pantalla d’etiquetes buida');
+    const create = async name => {
+      $('[data-form="create"] [name="label"]').value = name;
+      $('[data-form="create"] .btn').click(); await sleep(60);
+    };
+    await create('Temps'); await create('Números'); await create('temps');
+    ok(S.tags.map(x => x.name).join() === 'Temps,Números' && /Ja hi ha una etiqueta/.test($('#toast').textContent), 'crear: dues principals, la repetida no');
+    $$('.tags-tree a').find(a => a.textContent.includes('Temps')).click(); await sleep(150);
+    ok($('h1.h').textContent === 'Temps' && /No en té cap a dins/.test($('.tags-panel:nth-of-type(2)').textContent), 'pantalla d’una etiqueta');
+    await create('Mesos');
+    const mesosId = S.tags.find(x => x.name === 'Mesos').id;
+    ok(S.tagLabel(mesosId) === 'Temps › Mesos' && $('.tags-tree a') && /Mesos/.test($('.tags-tree').textContent), 'crear a dins');
+    await go('#/etiquetes/' + mesosId);
+    ok(/Temps/.test($('.tags-crumbs').textContent) && $$('.tile-pick').length === S.kanji.length, 'camí i totes les fitxes per triar');
+    const pickTile = ch => $$('.tile-pick').find(x => x.dataset.k === ch);
+    pickTile('月').click(); pickTile('日').click(); await sleep(30);
+    ok(pickTile('月').getAttribute('aria-pressed') === 'true' && /^2 /.test($('.tags-count').textContent), 'tocar fitxes: 2 amb l’etiqueta');
+    pickTile('日').click(); await sleep(30);
+    ok(S.cardTags('月').join() === mesosId && !S.cardTags('日').length && /^1 /.test($('.tags-count').textContent), 'tornar a tocar la treu');
+    type($('.tags-search'), 'lluna');
+    ok($$('.tile-pick').length === 1, 'cerca dins de l’etiqueta');
+
+    await go('#/');
+    const tagChip = name => $$('.home-tags [data-act="tag"]').find(c => c.textContent === name);
+    ok(tagChip('Temps') && tagChip('Números') && !tagChip('Mesos'), 'inici: les principals');
+    tagChip('Temps').click(); await sleep(30);
+    ok($$('.tile').map(x => x.dataset.k).join() === '月' && tagChip('Mesos') && $('.home-tags-sub'), 'Temps: inclou les de Mesos i obre la fila de dins');
+    tagChip('Mesos').click(); await sleep(30);
+    ok(tagChip('Mesos').getAttribute('aria-pressed') === 'true' && $$('.tile').length === 1, 'Mesos premut');
+    tagChip('Temps').click(); await sleep(30);
+    ok(!$('.home-tags-sub') && $$('.tile').length === S.kanji.length, 'tornar a prémer Temps treu el filtre');
+    type($('.search'), 'temps');
+    ok($$('.tile').map(x => x.dataset.k).join() === '月', 'cercador: «temps» troba les de Mesos');
+
+    await go('#/k/' + encodeURIComponent('水'));
+    ok(/no té cap etiqueta/.test($('.card-tags').textContent), 'fitxa sense etiquetes');
+    $('[data-act="tags"]').click(); await sleep(30);
+    ok($$('.tag-pick').map(b => b.textContent).join() === 'Números,Temps,Mesos', 'fitxa: totes en arbre');
+    $$('.tag-pick').find(b => b.textContent === 'Números').click(); await sleep(30);
+    $('[data-act="tags"]').click(); await sleep(30);
+    ok($('.card-tag-list') && $('.card-tag-list').textContent === 'Números', 'fitxa: posada i es veu en tancar');
+    await go('#/');
+    type($('.search'), 'numeros');
+    ok($$('.tile').map(x => x.dataset.k).join() === '水', 'cercador sense accents: «numeros» → 水');
+    type($('.search'), '');
+
+    const tempsId = S.tags.find(x => x.name === 'Temps').id;
+    await go('#/etiquetes/' + tempsId);
+    W().confirm = () => true;
+    $('[data-act="delete"]').click(); await sleep(150);
+    ok(S.tags.map(x => x.name).join() === 'Números' && !S.cardTags('月').length && W().location.hash === '#/etiquetes', 'esborrar: amb les de dins, les fitxes la perden');
+    ok(S.get('月'), 'la fitxa no s’esborra');
   } catch (e) { fails++; log('EXCEPCIÓ ' + e.stack); }
   log(fails ? `\n${fails} FAILS` : '\nTOT OK');
   document.title = 'done';

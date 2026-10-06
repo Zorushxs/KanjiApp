@@ -3,7 +3,7 @@
 // render pinta la pantalla dins de root i key (opcional) rep les tecles.
 const App = (() => {
   const { $, html } = U;
-  const ROUTES = { '': Inici, k: Fitxa, afegir: Afegir, practica: Practica, calendari: Calendari };
+  const ROUTES = { '': Inici, k: Fitxa, afegir: Afegir, practica: Practica, calendari: Calendari, etiquetes: Etiquetes };
   let current = null;       // pantalla que es veu
   let lastHash = null;      // per saber si es repinta la mateixa pantalla
   let saveState = 'saved';  // saving | saved | error

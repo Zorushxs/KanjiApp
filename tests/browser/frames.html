@@ -39,6 +39,14 @@
     d.kanji.forEach(k => { d.progress[k.kanji] = { box: 2, due: today, seen: 3, fails: 1 }; });
     localStorage.setItem('kanji:dades', JSON.stringify(d));
   }
+  // tags=1: etiquetes d'exemple en arbre (Temps › Mesos, Temps › Dies, Números, Natura) posades a alguns kanji.
+  if (q.get('tags')) {
+    const d = JSON.parse(localStorage.getItem('kanji:dades'));
+    d.tags = [{ id: 't1', name: 'Temps', parent: '' }, { id: 't2', name: 'Mesos', parent: 't1' }, { id: 't3', name: 'Dies', parent: 't1' },
+      { id: 't4', name: 'Números', parent: '' }, { id: 't5', name: 'Natura', parent: '' }];
+    d.cardTags = { '日': ['t3', 't5'], '月': ['t2', 't5'], '火': ['t3'], '水': ['t3', 't5'], '木': ['t5'] };
+    localStorage.setItem('kanji:dades', JSON.stringify(d));
+  }
   q.getAll('r').forEach(r => {
     const f = document.createElement('iframe');
     f.width = w; f.height = h; f.src = '../../index.html' + r;

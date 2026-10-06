@@ -1,5 +1,5 @@
 // Fitxa d'un kanji o d'una paraula: significats, lectures amb veu, ordre de traços (kanji) o kanji que la
-// formen (paraula), exemples, mnemotècnia i verificació. Té un mode edició per corregir els textos.
+// formen (paraula), exemples, mnemotècnia, etiquetes i verificació. Té un mode edició per corregir els textos.
 const Fitxa = (() => {
   const { html } = U;
   const state = {
@@ -10,6 +10,7 @@ const Fitxa = (() => {
     editing: null,    // kanji de la fitxa en mode edició, o null
     picks: [],        // en editar: lectures principals triades (màx. 2), en ordre
     picksStart: '',   // les que hi havia en començar a editar (per saber si n'has canviat)
+    tagging: false,   // el panell d'etiquetes mostra totes les etiquetes per posar-les o treure-les
   };
   let paintVerification = null; // repinta la verificació de la fitxa que es veu (per a les tecles V i E)
   window.addEventListener('hashchange', () => { state.editing = null; }); // en anar a una altra pantalla es deixa d'editar
@@ -87,6 +88,17 @@ const Fitxa = (() => {
         paintMainChips(root);
         root.querySelector('[data-main-max]').hidden = !full;
       },
+      // Etiquetes: «Canviar» les mostra totes; cada una es posa o es treu al moment.
+      tags() {
+        state.tagging = !state.tagging;
+        root.querySelector('.card-tags').outerHTML = String(tagsPanel(card));
+        root.querySelector('[data-act="tags"]').focus();
+      },
+      tag(button) {
+        const on = button.getAttribute('aria-pressed') !== 'true';
+        Store.setCardTag(ch, button.dataset.tag, on);
+        button.setAttribute('aria-pressed', on);
+      },
       replay: () => Traces.play(root.querySelector('.so')),
       'so-retry': () => Traces.mount(root.querySelector('.so'), ch, card.strokes),
       verify() {
@@ -129,6 +141,7 @@ const Fitxa = (() => {
           ${sentencePanel(card)}
           ${foldPanel('origin', t('card.origin'), I18n.tr(card.origin))}
           ${foldPanel('trivia', t('card.trivia'), I18n.tr(card.trivia))}
+          ${tagsPanel(card)}
           ${checkPanel(card, word)}
         </div>
       </article>`;
@@ -229,6 +242,29 @@ const Fitxa = (() => {
   function foldPanel(id, title, text) {
     if (!text) return '';
     return html`<details class="panel fold" data-fold="${id}"><summary>${title}</summary><p>${text}</p></details>`;
+  }
+
+  // Etiquetes de la fitxa, amb el camí (Temps › Mesos). Amb «Canviar» es veuen totes en arbre, com a botons
+  // premuts (la té) o no; el panell es queda obert en passar a la fitxa següent, per etiquetar-ne unes quantes.
+  function tagsPanel(card) {
+    const button = html`<button type="button" class="btn small" data-act="tags" aria-expanded="${state.tagging}">${
+      t(state.tagging ? 'tags.done' : 'tags.change')}</button>`;
+    return html`<section class="panel card-tags"><h2>${t('tags.title')}${button}</h2>${
+      state.tagging ? tagPicker(card) : tagList(card)}</section>`;
+  }
+  function tagList(card) {
+    const own = Store.cardTags(card.kanji);
+    const tags = Store.tagTree().filter(item => own.includes(item.tag.id));
+    if (!tags.length) return html`<p class="hint">${t('tags.cardNone')}</p>`;
+    return html`<div class="card-tag-list">${tags.map(item => html`<span class="pill">${Store.tagLabel(item.tag.id)}</span>`)}</div>`;
+  }
+  function tagPicker(card) {
+    const own = Store.cardTags(card.kanji), tree = Store.tagTree();
+    const manage = html`<a class="btn small" href="#/etiquetes">✎ ${t('tags.manage')}</a>`;
+    if (!tree.length) return html`<p class="hint">${t('tags.none')}</p><div class="row">${manage}</div>`;
+    const pick = ({ tag, depth }) => html`<button type="button" class="tag-pick" data-act="tag" data-tag="${tag.id}"
+      aria-pressed="${own.includes(tag.id)}" style="--depth: ${depth}">${tag.name}</button>`;
+    return html`<p class="hint">${t('tags.pickHint')}</p><div class="tag-tree">${tree.map(pick)}</div><div class="row">${manage}</div>`;
   }
 
   // Verificació, editar, Jisho, regenerar i esborrar.

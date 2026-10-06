@@ -814,6 +814,67 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
   border: 0;
 }
 
+/* ---------- Etiquetes ---------- */
+/* Inici: fila a part dels altres filtres (sota, a tota l'amplada); les de dins surten en una fila més, amb «›». */
+.home-tags { display: grid; gap: 6px; grid-column: 1 / -1; }
+.home-tags .chips { flex-wrap: wrap; overflow: visible; align-items: center; }
+.home-tags-l { flex: none; margin-right: 2px; font-size: 13.5px; font-weight: 600; color: var(--mute); }
+.home-tags-sub { padding-left: 10px; }
+.home-tags-edit { color: var(--ink); text-decoration: none; border-style: dashed; }
+/* Fitxa: les que té (pastilles) i, en canviar-les, l'arbre de botons (premut = la té). */
+.card-tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-tree { display: grid; justify-items: start; gap: 6px; margin-top: 10px; }
+.tag-pick {
+  margin-left: calc(var(--depth, 0) * 20px);
+  padding: 5px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 14.5px;
+}
+.tag-pick[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.tag-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Pantalla d'etiquetes: arbre amb el nombre de fitxes, formularis i rajoles per triar. */
+.tags-crumbs { margin: 0 0 2px; color: var(--mute); font-size: 14px; }
+.tags-crumbs a { color: inherit; }
+.tags-panel + .tags-panel { margin-top: 12px; }
+.tags-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tags-tree li { margin-left: calc(var(--depth, 0) * 20px); }
+.tags-tree li + li { border-top: 1px solid var(--line); padding-top: 4px; }
+.tags-tree a {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 4px;
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.tags-tree a:hover { background: var(--hover); }
+.tags-tree small { color: var(--mute); font-variant-numeric: tabular-nums; }
+.tags-form { display: grid; gap: 10px; margin-top: 12px; }
+h2 + .tags-form { margin-top: 0; }
+.tags-form > .btn { justify-self: start; }
+.tags-form.inline { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.fld select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  font-size: 16px;
+  font-weight: 400;
+}
+.tags-search { margin-top: 10px; }
+.tags-count { margin: 10px 0; }
+.tile-pick { width: 100%; font: inherit; cursor: pointer; }
+.tile-check {
+  position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 50%; border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: transparent;
+}
+.tile-pick[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.tile-pick[aria-pressed="true"] .tile-check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
 /* ---------- Avisos ---------- */
 .toast {
   position: fixed; left: 50%; bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 20; transform: translateX(-50%);

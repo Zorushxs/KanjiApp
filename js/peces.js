@@ -77,6 +77,15 @@ const Peces = (() => {
       <span class="boxes" aria-hidden="true">${boxes}</span>
     </a>`;
   }
+  // Rajola que es prem en lloc d'obrir la fitxa (per posar o treure una etiqueta a la pantalla d'etiquetes).
+  function pickTile(card, on) {
+    const meaning = I18n.list(card.meanings)[0] || '';
+    return html`<button type="button" class="tile tile-pick" data-act="pick" data-k="${card.kanji}" aria-pressed="${on}">
+      <span class="tile-check" aria-hidden="true">✓</span>
+      <span class="tile-k${Card.sizeClass(card.kanji)}" lang="ja">${card.kanji}</span>
+      <span class="tile-m">${meaning}</span>
+    </button>`;
+  }
 
-  return { ro, roList, setRomaji, romajiBtn, kun, readingList, mainHtml, mark, say, tile };
+  return { ro, roList, setRomaji, romajiBtn, kun, readingList, mainHtml, mark, say, tile, pickTile };
 })();

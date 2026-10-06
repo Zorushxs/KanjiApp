@@ -1,4 +1,5 @@
-// Pantalla d'inici: què toca avui, cerca, filtres (nivell JLPT i kanji/paraules), què es mostra i graella de fitxes.
+// Pantalla d'inici: què toca avui, cerca, filtres (nivell JLPT, kanji/paraules i etiquetes), què es mostra i
+// graella de fitxes.
 const Inici = (() => {
   const { html } = U;
   // Cerca i filtres. Es recorden mentre l'app és oberta (no en tornar-la a obrir).
@@ -6,33 +7,53 @@ const Inici = (() => {
     query: '',
     level: 'all',
     kinds: new Set(), // 'kanji' i/o 'word'; si no n'hi ha cap, es veuen tots dos
+    tagPath: [], // etiquetes premudes, de la principal cap avall (Temps › Mesos); filtra per l'última
     sorting: false, // mode «Reordenar» (només a l'ordinador): les fitxes es poden arrossegar
   };
   let screen = null; // la pantalla pintada, per a les tecles
 
   // ---------- Cerca ----------
-  const normalize = text => U.hira(String(text).toLowerCase());
-  // Text on es busca: significats en tots els idiomes, lectures en kana i en rōmaji, i exemples.
+  // Minúscules, sense accents (numeros = números, kyo = kyō) i el katakana com a hiragana.
+  const normalize = text => U.hira(String(text).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC'));
+  // Text on es busca: significats en tots els idiomes, lectures en kana i en rōmaji, exemples i etiquetes
+  // (amb les de més amunt: una fitxa de «Mesos» també surt si busques «Temps»).
   function searchText(card) {
     const readings = [
       card.reading, card.reading2, ...card.onyomi, ...card.kunyomi.map(Card.plain), ...card.examples.map(e => e.reading),
     ].filter(Boolean);
+    const tags = Store.cardTags(card.kanji).map(id => Store.tagLabel(id));
     return normalize([
       card.kanji,
       ...Object.values(card.meanings).flat(),
       ...readings,
       ...readings.map(U.romaji),
       ...card.examples.map(e => e.word),
+      ...tags,
     ].join(' '));
   }
+  // La fitxa coincideix amb el que has escrit al cercador? (També la fa servir la pantalla d'etiquetes.)
+  const matches = (card, query) => !query.trim() || searchText(card).includes(normalize(query.trim()));
 
   // La llista tal com es veu (cerca + filtres). La fitxa la fa servir per anar a l'anterior i a la següent.
   function visible() {
-    const query = normalize(state.query.trim());
+    checkTagPath();
+    const tagId = state.tagPath[state.tagPath.length - 1];
+    const inTag = tagId ? new Set(Store.cardsInTag(tagId)) : null;
     return Store.kanji.filter(card =>
       (state.level === 'all' || Card.level(card) === state.level)
       && (!state.kinds.size || state.kinds.has(Card.kind(card)))
-      && (!query || searchText(card).includes(query)));
+      && (!inTag || inTag.has(card))
+      && matches(card, state.query));
+  }
+  // Si has esborrat o mogut alguna etiqueta premuda, el filtre es queda fins a l'última que encara encaixa.
+  function checkTagPath() {
+    const path = [];
+    for (const id of state.tagPath) {
+      const tag = Store.tag(id);
+      if (!tag || tag.parent !== (path[path.length - 1] || '')) break;
+      path.push(id);
+    }
+    state.tagPath = path;
   }
 
   // ---------- Pintar ----------
@@ -57,6 +78,7 @@ const Inici = (() => {
         <input type="search" class="search" value="${state.query}" placeholder="${t('home.search')}"
           aria-label="${t('home.search')}" autocomplete="off">
         <div class="chips">${filterChips(levels, hasWords)}</div>
+        <div class="home-tags">${tagRows()}</div>
       </div>
       <div class="view-opts"><span>${t('home.show')}</span>
         ${viewSwitch('meanings', t('home.showMeanings'))}${viewSwitch('romaji', t('home.showRomaji'))}
@@ -92,6 +114,16 @@ const Inici = (() => {
         if (on) state.kinds.add(kind);
         else state.kinds.delete(kind);
         setPressed(chip, on);
+        paintGrid();
+      },
+      // Etiqueta: premuda, filtra (amb les de dins) i obre una fila amb les de dins; tornar-la a prémer la treu.
+      tag(chip) {
+        const depth = +chip.dataset.depth, id = chip.dataset.tag;
+        const on = state.tagPath[depth] !== id;
+        state.tagPath = on ? [...state.tagPath.slice(0, depth), id] : state.tagPath.slice(0, depth);
+        root.querySelector('.home-tags').innerHTML = tagRows();
+        const same = root.querySelector(`.home-tags [data-tag="${id}"]`);
+        if (same) same.focus();
         paintGrid();
       },
       sort() {
@@ -194,6 +226,26 @@ const Inici = (() => {
         kindChip('word', t('home.wordType')),
       ]}` : ''}`;
   }
+  // Files d'etiquetes, a part dels altres filtres: primer les principals i, per cada una de premuda,
+  // una fila més amb les de dins. Al final, l'enllaç per crear-les i organitzar-les.
+  function tagRows() {
+    checkTagPath();
+    const edit = html`<a class="chip home-tags-edit" href="#/etiquetes">✎ ${t(Store.tags.length ? 'tags.edit' : 'tags.create')}</a>`;
+    const rows = ['', ...state.tagPath].map((parent, depth) => {
+      const children = Store.tagChildren(parent);
+      if (depth && !children.length) return '';
+      const chips = children.map(tag => {
+        const on = state.tagPath[depth] === tag.id;
+        return html`<button type="button" class="chip${on ? ' on' : ''}" data-act="tag" data-tag="${tag.id}"
+          data-depth="${depth}" aria-pressed="${on}">${tag.name}</button>`;
+      });
+      return depth
+        ? html`<div class="chips home-tags-sub"><span class="home-tags-l" aria-hidden="true">›</span>${chips}</div>`
+        : html`<div class="chips"><span class="home-tags-l">${t('tags.title')}</span>${chips}${edit}</div>`;
+    });
+    return html`${rows}`;
+  }
+
   function setPressed(chip, on) {
     chip.classList.toggle('on', on);
     chip.setAttribute('aria-pressed', on);
@@ -204,5 +256,5 @@ const Inici = (() => {
     <button type="button" class="switch" role="switch" aria-checked="${Prefs.view(key)}" data-act="pref" data-pref="${key}"><i></i></button>
     <span>${label}</span></label>`;
 
-  return { nav: 'home', render, key, visible };
+  return { nav: 'home', render, key, visible, matches };
 })();
