@@ -590,7 +590,8 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
 
     // ---- Etiquetes: crear-les en arbre, triar fitxes, filtrar i cercar a l'inici, fitxa i esborrar ----
     await go('#/');
-    ok($('.home-tags .home-tags-edit') && !$('.home-tags [data-act="tag"]'), 'inici sense etiquetes: només l’enllaç per crear-ne');
+    ok($('.home-tags .home-tags-edit') && $$('.home-tags [data-act="tag"]').map(c => c.dataset.tag).join() === 'none',
+      'inici sense etiquetes: «Sense etiqueta» i l’enllaç per crear-ne');
     ok(!$('.finder > .chips .home-tags-edit') && !$('.finder > .chips [data-act="tag"]'), 'les etiquetes van en una fila a part');
     $('.home-tags-edit').click(); await sleep(150);
     ok(W().location.hash === '#/etiquetes' && /Encara no tens cap etiqueta/.test($('.tags-panel:last-child').textContent), 'pantalla d’etiquetes buida');
@@ -601,7 +602,7 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     await create('Temps'); await create('Números'); await create('temps');
     ok(S.tags.map(x => x.name).join() === 'Temps,Números' && /Ja hi ha una etiqueta/.test($('#toast').textContent), 'crear: dues principals, la repetida no');
     $$('.tags-tree a').find(a => a.textContent.includes('Temps')).click(); await sleep(150);
-    ok($('h1.h').textContent === 'Temps' && /No en té cap a dins/.test($('.tags-panel:nth-of-type(2)').textContent), 'pantalla d’una etiqueta');
+    ok($('h1.h').textContent === 'Temps' && /No en té cap a dins/.test($('.tags-panel:nth-of-type(1)').textContent), 'pantalla d’una etiqueta');
     await create('Mesos');
     const mesosId = S.tags.find(x => x.name === 'Mesos').id;
     ok(S.tagLabel(mesosId) === 'Temps › Mesos' && $('.tags-tree a') && /Mesos/.test($('.tags-tree').textContent), 'crear a dins');
@@ -618,6 +619,7 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     await go('#/');
     const tagChip = name => $$('.home-tags [data-act="tag"]').find(c => c.textContent === name);
     ok(tagChip('Temps') && tagChip('Números') && !tagChip('Mesos'), 'inici: les principals');
+    ok($$('.home-tags [data-act="tag"]').map(c => c.textContent).join() === 'Sense etiqueta,Números,Temps', 'inici: «Sense etiqueta» la primera');
     tagChip('Temps').click(); await sleep(30);
     ok($$('.tile').map(x => x.dataset.k).join() === '月' && tagChip('Mesos') && $('.home-tags-sub'), 'Temps: inclou les de Mesos i obre la fila de dins');
     tagChip('Mesos').click(); await sleep(30);
@@ -626,6 +628,14 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     ok(!$('.home-tags-sub') && $$('.tile').length === S.kanji.length, 'tornar a prémer Temps treu el filtre');
     type($('.search'), 'temps');
     ok($$('.tile').map(x => x.dataset.k).join() === '月', 'cercador: «temps» troba les de Mesos');
+    type($('.search'), '');
+    $('.home-tags [data-tag="none"]').click(); await sleep(30);
+    ok($$('.tile').length === S.kanji.length - 1 && !$$('.tile').some(x => x.dataset.k === '月'), '«Sense etiqueta»: totes menys 月');
+    ok(tagChip('Temps').getAttribute('aria-pressed') === 'false' && !$('.home-tags-sub'), '«Sense etiqueta» no obre cap fila');
+    $('.home-tags [data-tag="none"]').click(); await sleep(30);
+    ok($$('.tile').length === S.kanji.length, 'tornar-la a prémer treu el filtre');
+    type($('.search'), 'sense etiqueta');
+    ok($$('.tile').length === S.kanji.length - 1, 'cercador: «sense etiqueta»');
 
     await go('#/k/' + encodeURIComponent('水'));
     ok(/no té cap etiqueta/.test($('.card-tags').textContent), 'fitxa sense etiquetes');
@@ -645,6 +655,12 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     $('[data-act="delete"]').click(); await sleep(150);
     ok(S.tags.map(x => x.name).join() === 'Números' && !S.cardTags('月').length && W().location.hash === '#/etiquetes', 'esborrar: amb les de dins, les fitxes la perden');
     ok(S.get('月'), 'la fitxa no s’esborra');
+    ok($('.tags-untagged + .tags-tree') && /Sense etiqueta automàtica/.test($('.tags-untagged').textContent) && $('.tags-untagged small').textContent === String(S.kanji.length - 1),
+      'llista: «Sense etiqueta» amb quantes en té (totes menys 水)');
+    $('.tags-untagged a').click(); await sleep(150);
+    ok(W().location.hash === '#/' && $('.home-tags [data-tag="none"]').getAttribute('aria-pressed') === 'true'
+      && $$('.tile').length === S.kanji.length - 1, 'en tocar-la, l’inici amb el filtre posat');
+    $('.home-tags [data-tag="none"]').click(); await sleep(30);
   } catch (e) { fails++; log('EXCEPCIÓ ' + e.stack); }
   log(fails ? `\n${fails} FAILS` : '\nTOT OK');
   document.title = 'done';

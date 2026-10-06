@@ -8,9 +8,13 @@ const Inici = (() => {
     level: 'all',
     kinds: new Set(), // 'kanji' i/o 'word'; si no n'hi ha cap, es veuen tots dos
     tagPath: [], // etiquetes premudes, de la principal cap avall (Temps › Mesos); filtra per l'última
+    // o ['none']: «Sense etiqueta», les fitxes que no en tenen cap
     sorting: false, // mode «Reordenar» (només a l'ordinador): les fitxes es poden arrossegar
   };
   let screen = null; // la pantalla pintada, per a les tecles
+  // «Sense etiqueta»: no es desa enlloc, es calcula cada vegada (els ids de les etiquetes són t1, t2…).
+  const UNTAGGED = 'none';
+  const untagged = card => !Store.cardTags(card.kanji).length;
 
   // ---------- Cerca ----------
   // Minúscules, sense accents (numeros = números, kyo = kyō) i el katakana com a hiragana.
@@ -21,7 +25,7 @@ const Inici = (() => {
     const readings = [
       card.reading, card.reading2, ...card.onyomi, ...card.kunyomi.map(Card.plain), ...card.examples.map(e => e.reading),
     ].filter(Boolean);
-    const tags = Store.cardTags(card.kanji).map(id => Store.tagLabel(id));
+    const tags = untagged(card) ? [t('tags.untagged')] : Store.cardTags(card.kanji).map(id => Store.tagLabel(id));
     return normalize([
       card.kanji,
       ...Object.values(card.meanings).flat(),
@@ -38,15 +42,20 @@ const Inici = (() => {
   function visible() {
     checkTagPath();
     const tagId = state.tagPath[state.tagPath.length - 1];
-    const inTag = tagId ? new Set(Store.cardsInTag(tagId)) : null;
+    const inTag = tagId && tagId !== UNTAGGED ? new Set(Store.cardsInTag(tagId)) : null;
     return Store.kanji.filter(card =>
       (state.level === 'all' || Card.level(card) === state.level)
       && (!state.kinds.size || state.kinds.has(Card.kind(card)))
       && (!inTag || inTag.has(card))
+      && (tagId !== UNTAGGED || untagged(card))
       && matches(card, state.query));
   }
   // Si has esborrat o mogut alguna etiqueta premuda, el filtre es queda fins a l'última que encara encaixa.
   function checkTagPath() {
+    if (state.tagPath[0] === UNTAGGED) {
+      state.tagPath = [UNTAGGED];
+      return;
+    }
     const path = [];
     for (const id of state.tagPath) {
       const tag = Store.tag(id);
@@ -227,18 +236,20 @@ const Inici = (() => {
       ]}` : ''}`;
   }
   // Files d'etiquetes, a part dels altres filtres: primer les principals i, per cada una de premuda,
-  // una fila més amb les de dins. Al final, l'enllaç per crear-les i organitzar-les.
+  // una fila més amb les de dins. «Sense etiqueta» va la primera, i al final hi ha l'enllaç per crear-les i organitzar-les.
   function tagRows() {
     checkTagPath();
     const edit = html`<a class="chip home-tags-edit" href="#/etiquetes">✎ ${t(Store.tags.length ? 'tags.edit' : 'tags.create')}</a>`;
     const rows = ['', ...state.tagPath].map((parent, depth) => {
       const children = Store.tagChildren(parent);
       if (depth && !children.length) return '';
-      const chips = children.map(tag => {
-        const on = state.tagPath[depth] === tag.id;
-        return html`<button type="button" class="chip${on ? ' on' : ''}" data-act="tag" data-tag="${tag.id}"
-          data-depth="${depth}" aria-pressed="${on}">${tag.name}</button>`;
-      });
+      const chip = (id, name, extra = '') => {
+        const on = state.tagPath[depth] === id;
+        return html`<button type="button" class="chip${extra}${on ? ' on' : ''}" data-act="tag" data-tag="${id}"
+          data-depth="${depth}" aria-pressed="${on}">${name}</button>`;
+      };
+      const chips = children.map(tag => chip(tag.id, tag.name));
+      if (!depth) chips.unshift(chip(UNTAGGED, t('tags.untagged'), ' home-tags-none'));
       return depth
         ? html`<div class="chips home-tags-sub"><span class="home-tags-l" aria-hidden="true">›</span>${chips}</div>`
         : html`<div class="chips"><span class="home-tags-l">${t('tags.title')}</span>${chips}${edit}</div>`;
@@ -256,5 +267,11 @@ const Inici = (() => {
     <button type="button" class="switch" role="switch" aria-checked="${Prefs.view(key)}" data-act="pref" data-pref="${key}"><i></i></button>
     <span>${label}</span></label>`;
 
-  return { nav: 'home', render, key, visible, matches };
+  // Obre l'inici amb una etiqueta premuda (la pantalla d'etiquetes, per a «Sense etiqueta»).
+  function showTag(id) {
+    state.tagPath = [id];
+    location.hash = '#/';
+  }
+
+  return { nav: 'home', render, key, visible, matches, showTag, UNTAGGED };
 })();

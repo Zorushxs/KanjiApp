@@ -44,8 +44,20 @@ const Etiquetes = (() => {
       ${backBar(t('card.back'))}
       <h1 class="h">${t('tags.title')}</h1>
       <section class="panel tags-panel"><h2>${t('tags.new')}</h2>${createForm('')}</section>
-      <section class="panel tags-panel"><h2>${t('tags.all')}</h2>${treeList(Store.tagTree(), 0)}</section>`;
-    U.onActions(root, { back });
+      <section class="panel tags-panel"><h2>${t('tags.all')}</h2>${untaggedRow()}${treeList(Store.tagTree(), 0)}</section>`;
+    U.onActions(root, {
+      back,
+      untagged(link, e) {
+        e.preventDefault();
+        Inici.showTag(Inici.UNTAGGED);
+      },
+    });
+  }
+  // «Sense etiqueta»: automàtica, amb les fitxes que no en tenen cap. Va la primera i porta a l'inici amb aquest filtre.
+  function untaggedRow() {
+    const n = Store.kanji.filter(card => !Store.cardTags(card.kanji).length).length;
+    return html`<ul class="tags-tree tags-untagged"><li><a href="#/" data-act="untagged">
+        <span>${t('tags.untagged')} <em>${t('tags.auto')}</em></span><small>${n}</small></a></li></ul>`;
   }
 
   // Arbre d'etiquetes: cada una amb quantes fitxes té (comptant les de dins). base: fondària de la primera.
@@ -80,9 +92,9 @@ const Etiquetes = (() => {
       ${backBar(t('tags.title'))}
       ${above.length ? html`<p class="tags-crumbs">${crumbs}</p>` : ''}
       <h1 class="h">${tag.name}</h1>
-      ${cardsPanel()}
       <section class="panel tags-panel"><h2>${t('tags.sub')}</h2>${treeList(subtree(tag.id), 1 + above.length)}${createForm(tag.id)}</section>
-      ${editPanel(tag)}`;
+      ${editPanel(tag)}
+      ${cardsPanel()}`;
     paintCards(root, tag);
     root.querySelector('.tags-search').oninput = e => {
       state.query = e.target.value;
