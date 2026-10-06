@@ -135,6 +135,18 @@ const Inici = (() => {
         if (same) same.focus();
         paintGrid();
       },
+      tagsToggle() {
+        Prefs.view('tags', !Prefs.view('tags'));
+        root.querySelector('.home-tags').innerHTML = tagRows();
+        root.querySelector('.home-tags-toggle').focus();
+      },
+      // Amb les etiquetes amagades: treu el filtre d'etiqueta.
+      tagClear() {
+        state.tagPath = [];
+        root.querySelector('.home-tags').innerHTML = tagRows();
+        root.querySelector('.home-tags-toggle').focus();
+        paintGrid();
+      },
       sort() {
         setSorting(!state.sorting);
       },
@@ -235,10 +247,21 @@ const Inici = (() => {
         kindChip('word', t('home.wordType')),
       ]}` : ''}`;
   }
-  // Files d'etiquetes, a part dels altres filtres: primer les principals i, per cada una de premuda,
-  // una fila més amb les de dins. «Sense etiqueta» va la primera, i al final hi ha l'enllaç per crear-les i organitzar-les.
+  // Files d'etiquetes, a part dels altres filtres. El botó «Etiquetes» les mostra o les amaga (es recorda); amagades,
+  // si n'hi ha una de premuda, al costat surt quina és i un toc la treu. Mostrades: primer les principals i, per
+  // cada una de premuda, una fila més amb les de dins. «Sense etiqueta» va la primera, i al final hi ha l'enllaç
+  // per crear-les i organitzar-les.
   function tagRows() {
     checkTagPath();
+    const open = Prefs.view('tags');
+    const toggle = html`<button type="button" class="home-tags-toggle" data-act="tagsToggle" aria-expanded="${open}">${
+      t('tags.title')}</button>`;
+    if (!open) {
+      const last = state.tagPath[state.tagPath.length - 1];
+      const active = last && html`<button type="button" class="chip on home-tags-clear" data-act="tagClear"
+        title="${t('tags.clear')}" aria-label="${t('tags.clear')}">${last === UNTAGGED ? t('tags.untagged') : Store.tagLabel(last)} ✕</button>`;
+      return html`<div class="chips">${toggle}${active}</div>`;
+    }
     const edit = html`<a class="chip home-tags-edit" href="#/etiquetes">✎ ${t(Store.tags.length ? 'tags.edit' : 'tags.create')}</a>`;
     const rows = ['', ...state.tagPath].map((parent, depth) => {
       const children = Store.tagChildren(parent);
@@ -252,7 +275,7 @@ const Inici = (() => {
       if (!depth) chips.unshift(chip(UNTAGGED, t('tags.untagged'), ' home-tags-none'));
       return depth
         ? html`<div class="chips home-tags-sub"><span class="home-tags-l" aria-hidden="true">›</span>${chips}</div>`
-        : html`<div class="chips"><span class="home-tags-l">${t('tags.title')}</span>${chips}${edit}</div>`;
+        : html`<div class="chips">${toggle}${chips}${edit}</div>`;
     });
     return html`${rows}`;
   }

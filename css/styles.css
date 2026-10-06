@@ -819,21 +819,23 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .home-tags { display: grid; gap: 6px; grid-column: 1 / -1; }
 .home-tags .chips { flex-wrap: wrap; overflow: visible; align-items: center; }
 .home-tags-l { flex: none; margin-right: 2px; font-size: 13.5px; font-weight: 600; color: var(--mute); }
-.home-tags-sub { padding-left: 10px; }
-.home-tags-edit { color: var(--ink); text-decoration: none; border-style: dashed; }
-/* Fitxa: les que té (pastilles) i, en canviar-les, l'arbre de botons (premut = la té). */
-.card-tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.tag-tree { display: grid; justify-items: start; gap: 6px; margin-top: 10px; }
-.tag-pick {
-  margin-left: calc(var(--depth, 0) * 20px);
+/* Botó «Etiquetes»: mostra o amaga les files; obert, premut (ple). Cantonades menys rodones que les pastilles. */
+.home-tags-toggle {
+  flex: none;
   padding: 5px 13px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 9px;
   background: var(--panel);
-  font-size: 14.5px;
+  font-size: 14px;
+  font-weight: 600;
 }
-.tag-pick[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.tag-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home-tags-toggle[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.home-tags-toggle:hover { border-color: var(--mute); }
+.home-tags-sub { padding-left: 10px; }
+.home-tags-edit { color: var(--ink); text-decoration: none; border-style: dashed; }
+/* Fitxa: les etiquetes que té, com a pastilles. */
+.card-tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-tags h2 .btn { text-transform: none; letter-spacing: normal; font: 600 14px/1.2 var(--sans); color: var(--ink); }
 /* Pantalla d'etiquetes: arbre amb el nombre de fitxes, formularis i rajoles per triar. */
 .tags-crumbs { margin: 0 0 2px; color: var(--mute); font-size: 14px; }
 .tags-crumbs a { color: inherit; }
