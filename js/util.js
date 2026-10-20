@@ -151,12 +151,13 @@ const U = (() => {
   }
 
   // Finestra modal per confirmar una acció. Torna una promesa: true si prems ok; false si prems cancel, Esc o
-  // toques fora. El focus comença a cancel, perquè un Enter sense voler no faci res.
-  function ask({ title, text, ok, cancel }) {
+  // toques fora. El focus comença a cancel, perquè un Enter sense voler no faci res. `body` és HTML ja segur
+  // que va sota el text; si hi ha enllaços, tocar-ne un tanca la finestra (com cancel) i hi va.
+  function ask({ title, text, body, ok, cancel }) {
     const dialog = document.createElement('dialog');
     dialog.className = 'ask';
     dialog.innerHTML = html`<form method="dialog">
-        <h2>${title}</h2>${text ? html`<p>${text}</p>` : ''}
+        <h2>${title}</h2>${text ? html`<p>${text}</p>` : ''}${body}
         <div class="ask-btns"><button value="no" class="btn">${cancel}</button><button value="yes" class="btn primary">${ok}</button></div>
       </form>`;
     document.body.append(dialog);
@@ -165,7 +166,9 @@ const U = (() => {
         resolve(dialog.returnValue === 'yes');
         dialog.remove();
       });
-      dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close('no'); }); // fora del quadre
+      dialog.addEventListener('click', e => {
+        if (e.target === dialog || e.target.closest('a[href]')) dialog.close('no'); // fora del quadre o un enllaç
+      });
       dialog.showModal();
       dialog.querySelector('[value="no"]').focus();
     });

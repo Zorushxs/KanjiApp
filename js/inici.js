@@ -161,12 +161,13 @@ const Inici = (() => {
       },
       // Verifica de cop les que es veuen i estan per verificar, després de confirmar-ho en una finestra.
       async verifyAll() {
-        const list = visible(), n = list.filter(card => card.verified === false).length;
+        const list = visible(), pending = list.filter(card => card.verified === false), n = pending.length;
         if (!n) return;
         const filtered = list.length < all.length;
         const sure = await U.ask({
           title: t('home.verifyAskTitle', { n }),
           text: t(filtered ? 'home.verifyAskFiltered' : 'home.verifyAskAll'),
+          body: html`<div class="ask-tiles">${pending.map(card => Peces.tile(card))}</div>`,
           ok: t('home.verifyAskOk', { n }),
           cancel: t('card.cancel'),
         });

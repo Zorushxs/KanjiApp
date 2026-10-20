@@ -699,6 +699,8 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     $('.verify-all-btn').click(); await sleep(50);
     ok($('dialog.ask[open]') && /1 fitxes per verificar/.test($('dialog.ask h2').textContent) && /Només les que es veuen/.test($('dialog.ask p').textContent)
       && D().activeElement === $('dialog.ask [value="no"]'), 'finestra per confirmar (amb filtre), el focus a cancel·lar');
+    ok($$('dialog.ask .ask-tiles .tile').length === 1 && $('dialog.ask .ask-tiles .tile-k').textContent === '火',
+      'la finestra ensenya les fitxes per verificar');
     $('dialog.ask [value="no"]').click(); await sleep(50);
     ok(!$('dialog.ask') && S.get('火').verified === false, 'cancel·lar: no canvia res');
     $('.verify-all-btn').click(); await sleep(50);
@@ -710,6 +712,11 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     ok(/Són totes/.test($('dialog.ask p').textContent), 'sense filtre: totes');
     $('dialog.ask').dispatchEvent(new MouseEvent('click', { bubbles: true })); await sleep(50);
     ok(!$('dialog.ask') && pendingN() === total - 2, 'tocar fora: cancel·la');
+    $('.verify-all-btn').click(); await sleep(50);
+    ok($$('dialog.ask .ask-tiles .tile').length === total - 2 && !$$('dialog.ask .ask-tiles .tile-k').some(k => k.textContent === '月'), 'sense filtre: totes les per verificar, sense la que té errors');
+    $('dialog.ask .ask-tiles .tile').click(); await sleep(80);
+    ok(!$('dialog.ask') && /^#\/k\//.test(W().location.hash) && pendingN() === total - 2, 'tocar-ne una: tanca la finestra i obre la fitxa');
+    await go('#/');
     $('.verify-all-btn').click(); await sleep(50);
     $('dialog.ask [value="yes"]').click(); await sleep(80);
     ok(pendingN() === 0 && S.get('月').verified === 'error' && $$('.tile .tile-ver.ver-ok').length === total - 1, 'totes verificades, la que té errors es queda');
