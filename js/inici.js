@@ -1,5 +1,5 @@
-// Pantalla d'inici: què toca avui, cerca, filtres (nivell JLPT, kanji/paraules i etiquetes), què es mostra i
-// graella de fitxes.
+// Pantalla d'inici: què toca avui, cerca, filtres (nivell JLPT i kanji/paraules), què es mostra i les fitxes,
+// totes en una graella o agrupades per categories (plegables).
 const Inici = (() => {
   const { html } = U;
   // Cerca i filtres. Es recorden mentre l'app és oberta (no en tornar-la a obrir).
@@ -7,12 +7,11 @@ const Inici = (() => {
     query: '',
     level: 'all',
     kinds: new Set(), // 'kanji' i/o 'word'; si no n'hi ha cap, es veuen tots dos
-    tagPath: [], // etiquetes premudes, de la principal cap avall (Temps › Mesos); filtra per l'última
-    // o ['none']: «Sense etiqueta», les fitxes que no en tenen cap
+    open: new Set(), // vista per categories: els grups oberts (ids de categoria, o 'none')
     sorting: false, // mode «Reordenar» (només a l'ordinador): les fitxes es poden arrossegar
   };
   let screen = null; // la pantalla pintada, per a les tecles
-  // «Sense etiqueta»: no es desa enlloc, es calcula cada vegada (els ids de les etiquetes són t1, t2…).
+  // «Sense categoria»: no es desa enlloc, es calcula cada vegada (els ids de les categories són t1, t2…).
   const UNTAGGED = 'none';
   const untagged = card => !Store.cardTags(card.kanji).length;
 
@@ -40,29 +39,10 @@ const Inici = (() => {
 
   // La llista tal com es veu (cerca + filtres). La fitxa la fa servir per anar a l'anterior i a la següent.
   function visible() {
-    checkTagPath();
-    const tagId = state.tagPath[state.tagPath.length - 1];
-    const inTag = tagId && tagId !== UNTAGGED ? new Set(Store.cardsInTag(tagId)) : null;
     return Store.kanji.filter(card =>
       (state.level === 'all' || Card.level(card) === state.level)
       && (!state.kinds.size || state.kinds.has(Card.kind(card)))
-      && (!inTag || inTag.has(card))
-      && (tagId !== UNTAGGED || untagged(card))
       && matches(card, state.query));
-  }
-  // Si has esborrat o mogut alguna etiqueta premuda, el filtre es queda fins a l'última que encara encaixa.
-  function checkTagPath() {
-    if (state.tagPath[0] === UNTAGGED) {
-      state.tagPath = [UNTAGGED];
-      return;
-    }
-    const path = [];
-    for (const id of state.tagPath) {
-      const tag = Store.tag(id);
-      if (!tag || tag.parent !== (path[path.length - 1] || '')) break;
-      path.push(id);
-    }
-    state.tagPath = path;
   }
 
   // ---------- Pintar ----------
@@ -87,19 +67,26 @@ const Inici = (() => {
         <input type="search" class="search" value="${state.query}" placeholder="${t('home.search')}"
           aria-label="${t('home.search')}" autocomplete="off">
         <div class="chips">${filterChips(levels, hasWords)}</div>
-        <div class="home-tags">${tagRows()}</div>
+        <div class="chips home-view">${viewChips()}</div>
       </div>
       <div class="view-opts"><span>${t('home.show')}</span>
         ${viewSwitch('meanings', t('home.showMeanings'))}${viewSwitch('romaji', t('home.showRomaji'))}
         <button type="button" class="tag tag-btn verify-all-btn" data-act="verifyAll" hidden></button>
         ${canSort() ? sortButton() : ''}</div>
       <p class="found" aria-live="polite"></p>
-      <div class="grid${Prefs.view('meanings') ? '' : ' hide-m'}"></div>`;
+      <div class="home-cards${Prefs.view('meanings') ? '' : ' hide-m'}"><div class="grid"></div><div class="cat-view"></div></div>`;
 
-    const grid = root.querySelector('.grid'), found = root.querySelector('.found');
+    const grid = root.querySelector('.grid'), catView = root.querySelector('.cat-view'), found = root.querySelector('.found');
+    // Totes en una graella, o per categories (aquí no es pot reordenar arrossegant).
     function paintGrid() {
-      const list = visible();
-      grid.innerHTML = html`${list.map(card => Peces.tile(card, day))}`;
+      const list = visible(), byCategory = Prefs.view('byCategory');
+      grid.hidden = byCategory;
+      catView.hidden = !byCategory;
+      const sortBtn = root.querySelector('.sort-btn');
+      if (sortBtn) sortBtn.hidden = byCategory;
+      // La vista amagada es buida, perquè no hi quedin rajoles velles.
+      catView.innerHTML = byCategory ? categoryGroups(list, day) : '';
+      grid.innerHTML = byCategory ? '' : html`${list.map(card => Peces.tile(card, day))}`;
       if (list.length === all.length) found.textContent = '';
       else found.textContent = list.length ? t('home.count', { n: list.length, total: all.length }) : t('home.none');
       paintVerifyAll(list);
@@ -134,27 +121,20 @@ const Inici = (() => {
         setPressed(chip, on);
         paintGrid();
       },
-      // Etiqueta: premuda, filtra (amb les de dins) i obre una fila amb les de dins; tornar-la a prémer la treu.
-      tag(chip) {
-        const depth = +chip.dataset.depth, id = chip.dataset.tag;
-        const on = state.tagPath[depth] !== id;
-        state.tagPath = on ? [...state.tagPath.slice(0, depth), id] : state.tagPath.slice(0, depth);
-        root.querySelector('.home-tags').innerHTML = tagRows();
-        const same = root.querySelector(`.home-tags [data-tag="${id}"]`);
-        if (same) same.focus();
+      // «Totes» o «Per categories» (es recorda).
+      view(chip) {
+        if (state.sorting) setSorting(false);
+        Prefs.view('byCategory', chip.dataset.byCategory === 'true');
+        root.querySelectorAll('[data-act="view"]').forEach(c => setPressed(c, c === chip));
         paintGrid();
       },
-      tagsToggle() {
-        Prefs.view('tags', !Prefs.view('tags'));
-        root.querySelector('.home-tags').innerHTML = tagRows();
-        root.querySelector('.home-tags-toggle').focus();
-      },
-      // Amb les etiquetes amagades: treu el filtre d'etiqueta.
-      tagClear() {
-        state.tagPath = [];
-        root.querySelector('.home-tags').innerHTML = tagRows();
-        root.querySelector('.home-tags-toggle').focus();
+      // Obre o plega un grup de la vista per categories.
+      group(head) {
+        const id = head.dataset.group;
+        if (state.open.has(id)) state.open.delete(id);
+        else state.open.add(id);
         paintGrid();
+        root.querySelector(`.cat-head[data-group="${id}"]`).focus();
       },
       sort() {
         setSorting(!state.sorting);
@@ -183,7 +163,7 @@ const Inici = (() => {
         }
         const show = Prefs.view('meanings', !Prefs.view('meanings'));
         toggle.setAttribute('aria-checked', show);
-        grid.classList.toggle('hide-m', !show);
+        root.querySelector('.home-cards').classList.toggle('hide-m', !show);
       },
     });
   }
@@ -202,7 +182,7 @@ const Inici = (() => {
     if (on) U.toast(t('home.sortHint'));
   }
   function key(e) {
-    if (!screen || !screen.querySelector('.sort-btn')) return;
+    if (!screen || !screen.querySelector('.sort-btn:not([hidden])')) return;
     const letter = e.key.toLowerCase();
     if (letter === 'r' || (e.key === 'Escape' && state.sorting)) {
       e.preventDefault();
@@ -273,37 +253,42 @@ const Inici = (() => {
         kindChip('word', t('home.wordType')),
       ]}` : ''}`;
   }
-  // Files d'etiquetes, a part dels altres filtres. El botó «Etiquetes» les mostra o les amaga (es recorda); amagades,
-  // si n'hi ha una de premuda, al costat surt quina és i un toc la treu. Mostrades: primer les principals i, per
-  // cada una de premuda, una fila més amb les de dins. «Sense etiqueta» va la primera, i al final hi ha l'enllaç
-  // per crear-les i organitzar-les.
-  function tagRows() {
-    checkTagPath();
-    const open = Prefs.view('tags');
-    const toggle = html`<button type="button" class="home-tags-toggle" data-act="tagsToggle" aria-expanded="${open}">${
-      t('tags.title')}</button>`;
-    if (!open) {
-      const last = state.tagPath[state.tagPath.length - 1];
-      const active = last && html`<button type="button" class="chip on home-tags-clear" data-act="tagClear"
-        title="${t('tags.clear')}" aria-label="${t('tags.clear')}">${last === UNTAGGED ? t('tags.untagged') : Store.tagLabel(last)} ✕</button>`;
-      return html`<div class="chips">${toggle}${active}</div>`;
-    }
-    const edit = html`<a class="chip home-tags-edit" href="#/etiquetes">✎ ${t(Store.tags.length ? 'tags.edit' : 'tags.create')}</a>`;
-    const rows = ['', ...state.tagPath].map((parent, depth) => {
-      const children = Store.tagChildren(parent);
-      if (depth && !children.length) return '';
-      const chip = (id, name, extra = '') => {
-        const on = state.tagPath[depth] === id;
-        return html`<button type="button" class="chip${extra}${on ? ' on' : ''}" data-act="tag" data-tag="${id}"
-          data-depth="${depth}" aria-pressed="${on}">${name}</button>`;
-      };
-      const chips = children.map(tag => chip(tag.id, tag.name));
-      if (!depth) chips.unshift(chip(UNTAGGED, t('tags.untagged'), ' home-tags-none'));
-      return depth
-        ? html`<div class="chips home-tags-sub"><span class="home-tags-l" aria-hidden="true">›</span>${chips}</div>`
-        : html`<div class="chips">${toggle}${chips}${edit}</div>`;
-    });
-    return html`${rows}`;
+  // «Veure: Totes | Per categories» i l'enllaç per gestionar les categories.
+  function viewChips() {
+    const byCategory = Prefs.view('byCategory');
+    const chip = (value, label) => html`<button type="button" class="chip${value === byCategory ? ' on' : ''}" data-act="view"
+      data-by-category="${value}" aria-pressed="${value === byCategory}">${label}</button>`;
+    return html`<span class="home-view-l">${t('home.view')}</span>${chip(false, t('home.viewAll'))}${chip(true, t('home.viewCats'))}
+      <a class="home-cats-edit" href="#/etiquetes">${t('tags.manage')}</a>`;
+  }
+
+  // ---------- Per categories ----------
+  // «Sense categoria» i cada categoria, plegades. En obrir-ne una surten les fitxes que hi són directament i les
+  // seves subcategories, també plegables. Només compten les fitxes que es veuen amb la cerca i els filtres, i els
+  // grups buits no surten; mentre cerques, tots estan oberts. Una fitxa amb dues categories surt a totes dues.
+  function categoryGroups(list, day) {
+    const shown = new Set(list), searching = !!state.query.trim();
+    const isOpen = id => searching || state.open.has(id);
+    const tiles = cards => (cards.length ? html`<div class="grid">${cards.map(card => Peces.tile(card, day))}</div>` : '');
+    const inBranch = id => Store.cardsInTag(id).filter(card => shown.has(card));
+    const direct = id => list.filter(card => Store.cardTags(card.kanji).includes(id));
+    const group = (id, name, cards, body, sub) => {
+      if (!cards.length) return '';
+      const open = isOpen(id);
+      return html`<section class="cat${sub ? ' cat-sub' : ''}">
+          <button type="button" class="cat-head" data-act="group" data-group="${id}" aria-expanded="${open}">
+            <span class="cat-name">${name}</span><span class="cat-n">${cards.length}</span></button>
+          ${open ? html`<div class="cat-body">${body()}</div>` : ''}
+        </section>`;
+    };
+    const subGroup = sub => group(sub.id, sub.name, inBranch(sub.id), () => tiles(inBranch(sub.id)), true);
+    const withoutCategory = list.filter(untagged);
+    const groups = [
+      group(UNTAGGED, t('tags.untagged'), withoutCategory, () => tiles(withoutCategory)),
+      ...Store.tagChildren('').map(tag => group(tag.id, tag.name, inBranch(tag.id),
+        () => html`${tiles(direct(tag.id))}${Store.tagChildren(tag.id).map(subGroup)}`)),
+    ];
+    return groups.some(Boolean) ? html`${groups}` : '';
   }
 
   function setPressed(chip, on) {
@@ -316,11 +301,12 @@ const Inici = (() => {
     <button type="button" class="switch" role="switch" aria-checked="${Prefs.view(key)}" data-act="pref" data-pref="${key}"><i></i></button>
     <span>${label}</span></label>`;
 
-  // Obre l'inici amb una etiqueta premuda (la pantalla d'etiquetes, per a «Sense etiqueta»).
-  function showTag(id) {
-    state.tagPath = [id];
+  // Obre l'inici per categories amb un grup obert (des de la pantalla de categories, per a «Sense categoria»).
+  function showGroup(id) {
+    Prefs.view('byCategory', true);
+    state.open.add(id);
     location.hash = '#/';
   }
 
-  return { nav: 'home', render, key, visible, matches, showTag, UNTAGGED };
+  return { nav: 'home', render, key, visible, matches, showGroup, UNTAGGED };
 })();

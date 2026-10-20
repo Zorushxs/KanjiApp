@@ -103,8 +103,9 @@ const Afegir = (() => {
         paintResult($);
       },
       apply() {
-        const toSave = state.rows.filter(row => row.status === 'new' || row.status === 'upd').map(row => row.item);
-        const result = Store.merge(toSave);
+        const toSave = state.rows.filter(row => row.status === 'new' || row.status === 'upd');
+        const result = Store.merge(toSave.map(row => row.item));
+        toSave.forEach(applyCategories);
         Object.assign(state, { input: '', paste: '', rows: null, error: '', regen: new Set(), theme: '', words: '' });
         state.done = t('add.applied', { a: result.added, u: result.updated });
         U.toast(state.done);
@@ -112,6 +113,18 @@ const Afegir = (() => {
       },
     });
   }
+
+  // ---------- Categories que proposa Claude ----------
+  // Una fitxa que ja té categories (les teves) no es toca; si no en té, rep les de Claude, i les que no
+  // existeixen es creen.
+  const keepsOwnCategories = row => Store.cardTags(row.item.kanji).length > 0;
+  function applyCategories(row) {
+    if (keepsOwnCategories(row)) return;
+    const ids = row.categories.map(path => Store.ensureTagPath(path)).filter(Boolean);
+    Store.addCardTags(row.item.kanji, ids);
+  }
+  // Les categories noves que es crearien en desar (sense repetir), com a text: «Menjar › Fruita».
+  const newCategories = rows => Store.newTagLabels(rows.filter(row => !keepsOwnCategories(row)).flatMap(row => row.categories));
 
   // Véns de «Regenerar» d'una fitxa (#/afegir/日): el kanji ja és al camp i marcat per regenerar.
   function startRegenerate(arg) {
@@ -251,8 +264,19 @@ const Afegir = (() => {
     const meanings = row.item ? I18n.list(row.item.meanings).join(', ') : '';
     const reading = row.item && row.item.reading
       ? html` · <span lang="ja">${row.item.reading}</span> ${Peces.ro(row.item.reading)}` : '';
-    return html`<li><span class="rk" lang="ja">${row.kanji || '?'}</span><span class="rm">${meanings}${reading}</span>${messages.length
-      ? html`<ul class="msgs">${messages}</ul>` : ''}</li>`;
+    return html`<li><span class="rk" lang="ja">${row.kanji || '?'}</span><span class="rm">${meanings}${reading}</span>${
+      categoryLine(row)}${messages.length ? html`<ul class="msgs">${messages}</ul>` : ''}</li>`;
+  }
+  // Les categories de la fitxa: les de Claude (les noves, marcades) o, si ja en té, les teves, que es queden.
+  function categoryLine(row) {
+    if (!row.item || (row.status !== 'new' && row.status !== 'upd')) return '';
+    if (keepsOwnCategories(row)) {
+      const own = Store.cardTags(row.item.kanji).map(id => Store.tagLabel(id)).join(' · ');
+      return html`<p class="add-cats">${t('add.catsKept', { list: own })}</p>`;
+    }
+    if (!row.categories.length) return '';
+    const label = path => html`${path.join(' › ')}${Store.findTagPath(path) ? '' : html` <em>${t('add.catNew')}</em>`}`;
+    return html`<p class="add-cats">${U.join(row.categories.map(label), ' · ')}</p>`;
   }
 
   function paintResult($) {
@@ -271,6 +295,7 @@ const Afegir = (() => {
     const byStatus = status => rows.filter(row => row.status === status);
     const toSave = byStatus('new').length + byStatus('upd').length;
     const missing = missingList(), complete = rows.filter(row => row.item).length;
+    const created = newCategories(rows.filter(row => row.status === 'new' || row.status === 'upd'));
     const group = status => {
       const list = byStatus(status);
       if (!list.length) return '';
@@ -284,6 +309,7 @@ const Afegir = (() => {
       ${rows.partial ? html`<p class="warn">${t('add.partial', { n: complete })}</p>` : ''}
       ${missing.length ? html`<div class="missing"><p class="warn">${t('add.missing', { list: missing.join(' ') })}</p>
         <button type="button" class="btn small" data-act="copy-missing">${t('add.copyMissing')}</button></div>` : ''}
+      ${created.length ? html`<p class="note">${t('add.catsCreated', { n: created.length, list: created.join(' · ') })}</p>` : ''}
       ${GROUPS.map(group)}
       <div class="row">${toSave
         ? html`<button type="button" class="btn primary" data-act="apply">${t('add.apply', { n: toSave })}</button>`

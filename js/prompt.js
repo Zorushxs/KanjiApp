@@ -1,7 +1,8 @@
-// Prompts per a Claude.ai (en anglès). Tots dos acaben amb el mateix format de fitxa (FORMAT); una fitxa
-// pot ser un kanji sol o una paraula (学校, 食べる, じゃがいも):
+// Prompts per a Claude.ai (en anglès). Els dos primers acaben amb el mateix format de fitxa (FORMAT) i les
+// instruccions de categories; una fitxa pot ser un kanji sol o una paraula (学校, 食べる, じゃがいも):
 // - cards(): fitxes dels kanji i paraules que has escrit tu.
 // - more(): que Claude en triï de nous sense repetir els que ja tens (temàtica + quants, i paraules a més a més).
+// - categorize(): només posar categories a fitxes que ja tens.
 const Prompt = (() => {
   const FORMAT = `Every explanatory text must be written in Catalan ("ca"), Spanish ("es") and English ("en").
 
@@ -24,7 +25,8 @@ these fields:
     ],
     "sentence": { "jp": "", "reading": "", "romaji": "", "meaning": { "ca": "", "es": "", "en": "" } },
     "trivia": { "ca": "", "es": "", "en": "" },
-    "verified": false
+    "verified": false,
+    "categories": ["Category › Subcategory"]
   }
 ]
 
@@ -69,6 +71,31 @@ Language style:
 - Spanish: natural, everyday Spanish from Spain.`;
 
   const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
+  const LANGUAGE = { ca: 'Catalan', es: 'Spanish', en: 'English' };
+
+  // Les categories que ja tens, i com ha de triar-les Claude: dos nivells com a molt, aprofitar les que hi ha i
+  // crear-ne de noves només si cal, amb el nom en l'idioma de l'app.
+  function categoryRules() {
+    const tree = Store.tagChildren('').map(tag => [
+      `  - ${tag.name}`,
+      ...Store.tagChildren(tag.id).map(sub => `    - ${sub.name}`),
+    ].join('\n')).join('\n');
+    const have = tree
+      ? `These are my categories now (a category, and its subcategories indented below it):
+${tree}
+Use them whenever a card fits, writing their names exactly as they are. Only create a new
+category or subcategory when none of them fits; when a new subcategory fits inside one of my
+categories, put it there.`
+      : `I don't have any categories yet: create the ones you need.`;
+    return `Categories: in "categories", put each card in 1-3 categories by topic, so I can organise my
+cards (for example "Calendar › Months", "Numbers", "Food › Fruit"). Each one is either
+"Category" or "Category › Subcategory": at most two levels, separated by " › ".
+${have}
+- Write the names of new categories in ${LANGUAGE[I18n.lang] || 'English'}: short (1-3 words) and starting
+  with a capital letter.
+- Group by meaning or topic, never by JLPT level or by whether it is a kanji or a word.
+- Prefer a subcategory when there is one that fits.`;
+  }
 
   // list: kanji sols i paraules (les paraules les escrius entre 「」 a la pantalla Afegir).
   function cards(list) {
@@ -79,7 +106,9 @@ Language style:
     ].filter(Boolean).join(', and ');
     return `You are a Japanese teacher. Create study cards for ${what}.
 
-I'm a beginner: I know hiragana and katakana, but few kanji. ${FORMAT}`;
+I'm a beginner: I know hiragana and katakana, but few kanji. ${FORMAT}
+
+${categoryRules()}`;
   }
 
   // "Els kanjis que tinc apresos són [llista] i en vull aprendre X d'aquesta temàtica; i, a més, aquestes paraules."
@@ -113,8 +142,29 @@ ${known}
 ${[kanjiPart, wordPart].filter(Boolean).join('\n\n')}
 Never repeat a kanji or a word I have already learned.
 
-${FORMAT}`;
+${FORMAT}
+
+${categoryRules()}`;
   }
 
-  return { cards, more };
+  // Posar categories a fitxes que ja tens: Claude només torna { kanji, categories } de cada una.
+  function categorize(cards) {
+    const line = card => {
+      const reading = card.reading ? ` (${card.reading})` : '';
+      return `${card.kanji}${reading}: ${I18n.list(card.meanings).slice(0, 3).join(', ')}`;
+    };
+    return `You are a Japanese teacher. I'm a beginner and I want to organise my study cards into
+categories. These are the cards (the Japanese, its reading and its meaning):
+${cards.map(line).join('\n')}
+
+${categoryRules()}
+
+Reply ONLY with one \`\`\`json code block containing a list with one object per card, with "kanji"
+written exactly as above:
+[
+  { "kanji": "日", "categories": ["Category › Subcategory"] }
+]`;
+  }
+
+  return { cards, more, categorize };
 })();

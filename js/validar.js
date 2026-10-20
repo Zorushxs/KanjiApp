@@ -105,7 +105,7 @@ const Validar = (() => {
   // (no es desa); els avisos es mostren però la fitxa es desa igualment.
   function check(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return { item: null, kanji: '', errors: [{ k: 'val.notObject' }], warnings: [] };
+      return { item: null, kanji: '', errors: [{ k: 'val.notObject' }], warnings: [], categories: [] };
     }
     const warn = notes(), errors = [];
     const card = coerce(raw, warn);
@@ -134,7 +134,24 @@ const Validar = (() => {
     checkExamples(raw, card, warn);
     checkMainReading(card, word, errors, warn);
     checkLanguages(card, warn);
-    return { item: errors.length ? null : card, kanji: card.kanji, errors, warnings: warn.list };
+    const categories = categoryPaths(raw.categories);
+    return { item: errors.length ? null : card, kanji: card.kanji, errors, warnings: warn.list, categories };
+  }
+
+  // Categories que proposa Claude: "Calendari › Mesos" → ['Calendari', 'Mesos']. Com a molt dos nivells i cinc
+  // categories per fitxa, sense repetir; cada nom, una línia de 40 caràcters com a molt.
+  function categoryPaths(value) {
+    const list = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+    const paths = [], seen = new Set();
+    list.forEach(item => {
+      if (typeof item !== 'string' || paths.length >= 5) return;
+      const names = item.split(/[›»>/]/).map(name => str(name, 40).replace(/…$/, '')).filter(Boolean).slice(0, 2);
+      const id = names.join('›').toLowerCase();
+      if (!names.length || seen.has(id)) return;
+      seen.add(id);
+      paths.push(names);
+    });
+    return paths;
   }
 
   // On'yomi en katakana, kun'yomi en hiragana, almenys una lectura, i el nombre de traços.
@@ -307,5 +324,5 @@ const Validar = (() => {
     else row.warnings.push({ k: kept.length > 1 ? 'add.keepsMains' : 'add.keepsMain', p: { v: kept.join(' / ') } });
   }
 
-  return { coerce, check, extract, review, note, isCard, isKana };
+  return { coerce, check, extract, review, note, isCard, isKana, categoryPaths };
 })();

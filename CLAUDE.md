@@ -5,7 +5,7 @@ Web per aprendre kanji i paraules en japonès, per a principiants. Les preferèn
 ## Tecnologia i convencions
 
 - HTML, CSS i JS sense dependències ni compilació, amb rutes relatives, pensat primer per al mòbil i amb tema clar i fosc.
-- **Cada canvi apuja `?v=N`** a totes les referències d'[index.html](index.html) amb `node tools/versio.js` (ara és `?v=30`). Si no, GitHub Pages serveix els fitxers vells.
+- **Cada canvi apuja `?v=N`** a totes les referències d'[index.html](index.html) amb `node tools/versio.js` (ara és `?v=32`). Si no, GitHub Pages serveix els fitxers vells.
 - **Interfície en ca/es/en**: tots els textos són a [js/i18n.js](js/i18n.js), en els tres idiomes (cadenes entre cometes simples i apòstrof tipogràfic ’). Els comentaris del codi són en català.
 - Són scripts clàssics, cadascun amb un IIFE que exposa un objecte global: `Prefs`, `I18n`/`t`, `U` (util), `Card`, `Peces`, `Almacen`, `Validar`, `Store`, `Prompt`, `Veu`, `Traces`, `Inici`, `Fitxa`, `Afegir`, `Practica`, `Calendari`, `Etiquetes`, `App`. L'ordre de càrrega és el d'index.html.
 - **On va cada cosa**: `U` només té coses generals (DOM, HTML, dates, kana → rōmaji, icones, avisos i la finestra per confirmar, `U.ask`). Les regles d'una fitxa (si és paraula, nivell, lectures principals, verificació) són a `Card` ([js/card.js](js/card.js)), sense HTML. Els trossos d'HTML que comparteixen les pantalles (rōmaji, lectures, botó de veu, rajola) són a `Peces` ([js/peces.js](js/peces.js)).
@@ -26,7 +26,7 @@ Web per aprendre kanji i paraules en japonès, per a principiants. Les preferèn
 - **Paraules** (学校, 食べる, じゃがいも): van a la mateixa llista `kanji`, amb `onyomi`/`kunyomi` buits i `strokes: null`. A l'inici i a la pràctica hi ha el filtre Kanji/Paraules (si no en tries cap, es veuen tots dos).
 - **Lectures principals**: `reading` és la que s'aprèn primer. `reading2` és opcional (七: しち / なな) i només la posa l'usuari, des de la fitxa; `Validar.check` la buida sempre que la dona Claude. En regenerar una fitxa, les lectures triades per l'usuari es mantenen si encara surten entre les lectures (`Card.keptMains`, `Store.merge`).
 - **El progrés va a part del contingut**, així que regenerar una fitxa no l'esborra.
-- **Etiquetes**: també a part del contingut. Fan un arbre (`parent` és `''` a les principals, i hi pot haver tants nivells com vulguis), en l’ordre que tries amb ↑ ↓ (el de la llista `tags`), i una fitxa en pot tenir moltes. Filtrar o cercar per una etiqueta inclou les de dins (`Store.cardsInTag`). Es posen des de la fitxa (panell «Etiquetes») o en grup a `#/etiquetes/<id>` (toques les fitxes). A l'inici tenen una fila de botons a part de Kanji/Paraules, i el cercador les troba sense accents. «Sense etiqueta» és automàtica (no es desa): són les fitxes que no en tenen cap.
+- **Categories** (al codi i a les dades, `tags`): també a part del contingut. Com a molt dos nivells (categoria › subcategoria; `parent` és `''` a les principals), en l’ordre que tries amb ↑ ↓ (el de la llista `tags`), i una fitxa en pot tenir moltes. **Les posa Claude**: el prompt porta les que ja tens i cada fitxa torna `categories: ["Calendari › Mesos"]` (`Validar.categoryPaths`); en desar es creen les que falten (`Store.ensureTagPath`), però una fitxa que ja en té es queda les seves. A `#/etiquetes`, «Categoritzar amb Claude» fa el mateix per a les fitxes sense categoria (`Prompt.categorize`). A l'inici, «Veure: Totes | Per categories» (grups plegables; `Prefs.view('byCategory')`). Es corregeixen des de la fitxa (panell «Categories») o a `#/etiquetes/<id>` (toques les fitxes). El cercador les troba sense accents. «Sense categoria» és automàtica (no es desa).
 - **Leitner**: dies `[0,1,3,7,14,30]`. Un repàs extra el mateix dia no fa pujar de caixa, però una fallada la torna a la caixa 1. `history` compta cada resposta.
 - **Rōmaji**: el de lectures i paraules el calcula l'app (`U.romaji`). El de la frase el dona Claude, perquè ha de saber que は es diu «wa».
 
@@ -35,6 +35,7 @@ Web per aprendre kanji i paraules en japonès, per a principiants. Les preferèn
 [js/prompt.js](js/prompt.js) genera el prompt que l'usuari copia a Claude.ai, i ell hi enganxa la resposta. [js/validar.js](js/validar.js) la valida (`coerce` per la forma, `check` estricte per al que ve de Claude, `review` amb els estats nou/actualitzat/igual/error), aprofita les respostes tallades (es queda amb les fitxes senceres) i [js/store.js](js/store.js) les fusiona per caràcter.
 
 - **«Trio els kanjis»**: l'usuari els escriu; una paraula sencera va entre 「」. Els que ja té surten en gris i no s'afegeixen al prompt.
+- **Categories**: tots dos prompts porten les categories que tens i les regles per triar-les (`Prompt` → `categoryRules`); la revisió ensenya on va cada fitxa i quines categories són noves.
 - **«Claude tria els kanjis»**: el botó **no copia res**, només ensenya les opcions (temàtica, quants n'hi ha (per defecte 10), paraules concretes). Quan prem «Copiar prompt», el prompt porta tots els kanji i paraules que ja té. Les paraules s'han d'escriure com es fa habitualment al Japó a nivell inicial (じゃがいも, no 芋).
 
 ## Proves

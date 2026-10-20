@@ -1,5 +1,5 @@
 // Fitxa d'un kanji o d'una paraula: significats, lectures amb veu, ordre de traços (kanji) o kanji que la
-// formen (paraula), exemples, mnemotècnia, etiquetes i verificació. Té un mode edició per corregir els textos.
+// formen (paraula), exemples, mnemotècnia, categories i verificació. Té un mode edició per corregir els textos.
 const Fitxa = (() => {
   const { html } = U;
   const state = {
@@ -10,6 +10,8 @@ const Fitxa = (() => {
     editing: null,    // kanji de la fitxa en mode edició, o null
     picks: [],        // en editar: lectures principals triades (màx. 2), en ordre
     picksStart: '',   // les que hi havia en començar a editar (per saber si n'has canviat)
+    tagging: false,   // el panell de categories està obert per corregir-les
+    openCats: new Set(), // categories desplegades en aquest panell
   };
   let paintVerification = null; // repinta la verificació de la fitxa que es veu (per a les tecles V i E)
   window.addEventListener('hashchange', () => { state.editing = null; }); // en anar a una altra pantalla es deixa d'editar
@@ -86,6 +88,19 @@ const Fitxa = (() => {
         else if (!full) state.picks.push(value);
         paintMainChips(root);
         root.querySelector('[data-main-max]').hidden = !full;
+      },
+      // Categories: «Canviar» les obre; cada categoria es desplega, i cada botó la posa o la treu al moment.
+      tags: () => repaintTags(root, card, '[data-act="tags"]', () => { state.tagging = !state.tagging; }),
+      pickOpen(button) {
+        const id = button.dataset.tag;
+        repaintTags(root, card, `[data-act="pickOpen"][data-tag="${id}"]`, () => {
+          if (state.openCats.has(id)) state.openCats.delete(id);
+          else state.openCats.add(id);
+        });
+      },
+      tag(button) {
+        const id = button.dataset.tag, on = button.getAttribute('aria-pressed') !== 'true';
+        repaintTags(root, card, `[data-act="tag"][data-tag="${id}"]`, () => Store.setCardTag(ch, id, on));
       },
       replay: () => Traces.play(root.querySelector('.so')),
       'so-retry': () => Traces.mount(root.querySelector('.so'), ch, card.strokes),
@@ -232,17 +247,46 @@ const Fitxa = (() => {
     return html`<details class="panel fold" data-fold="${id}"><summary>${title}</summary><p>${text}</p></details>`;
   }
 
-  // Etiquetes de la fitxa, amb el camí (Temps › Mesos). «Canviar» porta a la pantalla d'etiquetes, on es
-  // gestionen totes (aquí la llista es faria massa llarga).
+  // Categories de la fitxa, amb el camí (Calendari › Mesos). «Canviar» les obre aquí mateix per corregir-les.
   function tagsPanel(card) {
     const own = Store.cardTags(card.kanji);
     const tags = Store.tagTree().filter(item => own.includes(item.tag.id));
+    const button = html`<button type="button" class="btn small" data-act="tags" aria-expanded="${state.tagging}">${
+      t(state.tagging ? 'tags.done' : 'tags.change')}</button>`;
     return html`<section class="panel card-tags">
-        <h2>${t('tags.title')}<a class="btn small" href="#/etiquetes">${t('tags.change')}</a></h2>
+        <h2>${t('tags.title')}${button}</h2>
         ${tags.length
           ? html`<div class="card-tag-list">${tags.map(item => html`<span class="pill">${Store.tagLabel(item.tag.id)}</span>`)}</div>`
           : html`<p class="hint">${t('tags.cardNone')}</p>`}
+        ${state.tagging ? tagPicker(own) : ''}
       </section>`;
+  }
+  // Fa un canvi, torna a pintar el panell de categories i deixa el focus al mateix botó.
+  function repaintTags(root, card, focusSelector, change) {
+    change();
+    root.querySelector('.card-tags').outerHTML = String(tagsPanel(card));
+    const target = root.querySelector(`.card-tags ${focusSelector}`);
+    if (target) target.focus();
+  }
+  // Per corregir-les: cada categoria es plega i es desplega, i a dins hi ha un botó per a ella mateixa i un per a
+  // cada subcategoria (premut = la fitxa la té). Les que no tenen subcategories són directament un botó.
+  function tagPicker(own) {
+    const manage = html`<div class="row"><a class="btn small" href="#/etiquetes">${t('tags.manage')}</a></div>`;
+    const roots = Store.tagChildren('');
+    if (!roots.length) return html`<p class="hint">${t('tags.none')}</p>${manage}`;
+    const pick = tag => html`<button type="button" class="tag-pick" data-act="tag" data-tag="${tag.id}"
+      aria-pressed="${own.includes(tag.id)}">${tag.name}</button>`;
+    const category = tag => {
+      const subs = Store.tagChildren(tag.id);
+      if (!subs.length) return html`<div class="pick-cat">${pick(tag)}</div>`;
+      const open = state.openCats.has(tag.id), marked = [tag, ...subs].filter(x => own.includes(x.id)).length;
+      return html`<div class="pick-cat">
+          <button type="button" class="cat-head" data-act="pickOpen" data-tag="${tag.id}" aria-expanded="${open}">
+            <span class="cat-name">${tag.name}</span>${marked ? html`<span class="cat-n">✓ ${marked}</span>` : ''}</button>
+          ${open ? html`<div class="pick-subs">${pick(tag)}${subs.map(pick)}</div>` : ''}
+        </div>`;
+    };
+    return html`<p class="hint">${t('tags.pickHint')}</p><div class="pick-tree">${roots.map(category)}</div>${manage}`;
   }
 
   // Verificació, editar, Jisho, regenerar i esborrar.

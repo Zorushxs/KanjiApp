@@ -339,6 +339,38 @@ ok(Store.tagTree().length === 3, 'norm: sense cercles (A dins de B dins de A)');
 ok(JSON.stringify(Store.snapshot().cardTags) === '{"日":["t1"]}', 'norm: etiquetes de fitxes que existeixen, sense repetir');
 ok(Store.addTag('F').id === 't5', 'id nou: el següent al més alt');
 
+// Categories: dos nivells com a molt, i les que proposa Claude
+Store.load({
+  kanji: ['一', '二', '月'].map(k => ({ ...good, kanji: k })),
+  tags: [{ id: 't1', name: 'A', parent: '' }, { id: 't2', name: 'B', parent: 't1' }, { id: 't3', name: 'C', parent: 't2' },
+    { id: 't4', name: 'D', parent: 't3' }],
+});
+ok(Store.tags.map(x => x.parent).join() === ',t1,t1,t1', 'norm: les de més avall passen a ser subcategories de la principal');
+ok(Store.addTag('E', 't2').error === 'tags.depth' && !Store.addTag('E', 't1').error, 'addTag: no es pot crear un tercer nivell');
+const catF = Store.addTag('F').id, catG = Store.addTag('G', catF).id;
+ok(Store.moveTag(catF, 't1').error === 'tags.depth' && Store.moveTag(catG, 't2').error === 'tags.depth' && !Store.moveTag(catG, 't1').error,
+  'moveTag: ni una amb subcategories dins d’una altra, ni dins d’una subcategoria');
+ok(Store.findTagPath(['a', 'b']) === 't2' && Store.findTagPath(['A']) === 't1' && Store.findTagPath(['A', 'Z']) === null, 'findTagPath: sense majúscules');
+ok(Store.newTagLabels([['A', 'B'], ['A', 'Nova'], ['Menjar', 'Fruita'], ['menjar']]).join('|') === 'A › Nova|Menjar|Menjar › Fruita',
+  'newTagLabels: les que caldria crear, sense repetir');
+const fruit = Store.ensureTagPath(['Menjar', 'Fruita']);
+ok(Store.tagLabel(fruit) === 'Menjar › Fruita' && Store.ensureTagPath(['menjar', 'fruita']) === fruit, 'ensureTagPath: crea les que falten i després les troba');
+Store.addCardTags('一', [fruit, 't1', 'tzz']); Store.addCardTags('一', ['t1']);
+ok(Store.cardTags('一').join() === [fruit, 't1'].join(), 'addCardTags: afegeix sense repetir ni treure');
+ok(JSON.stringify(Validar.categoryPaths(['Calendari › Mesos', 'calendari›mesos', 'Números', 'A > B > C', ' ', 3, 'X/Y']))
+  === '[["Calendari","Mesos"],["Números"],["A","B"],["X","Y"]]', 'categoryPaths: camins nets, dos nivells, sense repetir');
+ok(Validar.categoryPaths('Natura').length === 1 && Validar.categoryPaths(null).length === 0, 'categoryPaths: un text sol o res');
+ok(Validar.check({ ...good, categories: ['Natura › Cel'] }).categories[0].join() === 'Natura,Cel', 'check torna les categories');
+Store.load({ kanji: [good], tags: [{ id: 't1', name: 'Calendari', parent: '' }, { id: 't2', name: 'Mesos', parent: 't1' }] });
+const withCats = Prompt.cards(['月']);
+ok(withCats.includes('"categories": ["Category › Subcategory"]') && withCats.includes('  - Calendari\n    - Mesos')
+  && withCats.includes('at most two levels') && withCats.includes('new categories in ' + { ca: 'Catalan', es: 'Spanish', en: 'English' }[I18n.lang]), 'prompt: les categories que tens, dos nivells i l’idioma');
+ok(Prompt.more({ have: [], n: 3 }).includes('These are my categories now'), 'more: també porta les categories');
+const catPrompt = Prompt.categorize([{ ...good, reading: 'にち' }]);
+ok(catPrompt.includes('日 (にち): ' + I18n.list(good.meanings).join(', ')) && catPrompt.includes('{ "kanji": "日", "categories"'), 'categorize: les fitxes i el format de resposta');
+Store.load({ kanji: [good] });
+ok(Prompt.cards(['月']).includes(`I don't have any categories yet`), 'prompt sense categories');
+
 // Verificar de cop: només les que estan per verificar (les que tenen errors no es toquen)
 Store.load({ kanji: ['一', '二', '三', '四'].map(k => ({ ...good, kanji: k, verified: false })) });
 Store.setVerified('二', 'error'); Store.setVerified('三', true);

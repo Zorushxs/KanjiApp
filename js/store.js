@@ -50,8 +50,9 @@ const Store = (() => {
     return { version: 1, kanji, progress, history, tags, cardTags };
   }
 
-  // Etiquetes: { id, name, parent }, amb parent '' per a les principals. Les que tenen un pare que no existeix
-  // o fan un cercle (A dins de B i B dins de A) passen a ser principals.
+  // Categories (al codi, "tags"): { id, name, parent }, amb parent '' per a les principals. Les que tenen un pare
+  // que no existeix o fan un cercle (A dins de B i B dins de A) passen a ser principals. Com a molt hi ha dos
+  // nivells (categoria › subcategoria): les que estaven més avall passen a ser subcategories de la principal.
   function normTags(input) {
     const tags = [], ids = new Set();
     (Array.isArray(input) ? input : []).forEach(raw => {
@@ -63,6 +64,16 @@ const Store = (() => {
     });
     tags.forEach(tag => {
       if (tag.parent && (!ids.has(tag.parent) || inLoop(tags, tag))) tag.parent = '';
+    });
+    const byId = new Map(tags.map(tag => [tag.id, tag]));
+    const topOf = tag => {
+      let top = tag;
+      while (top.parent) top = byId.get(top.parent);
+      return top;
+    };
+    const roots = new Map(tags.map(tag => [tag, topOf(tag)]));
+    tags.forEach(tag => {
+      if (tag.parent && byId.get(tag.parent).parent) tag.parent = roots.get(tag).id;
     });
     return tags;
   }
@@ -255,10 +266,12 @@ const Store = (() => {
       return data.kanji.filter(card => (data.cardTags[card.kanji] || []).some(x => branch.has(x)));
     },
     // Crear, canviar el nom i moure tornen { error } (clau d'i18n) si no es pot; crear també torna { id }.
+    // Només es pot crear dins d'una principal (dos nivells com a molt).
     addTag(name, parent = '') {
       const clean = tagName(name);
       if (!clean) return { error: 'tags.empty' };
       if (parent && !findTag(parent)) parent = '';
+      if (parent && findTag(parent).parent) return { error: 'tags.depth' };
       if (nameTaken(clean, parent)) return { error: 'tags.taken' };
       const id = nextTagId();
       data.tags.push({ id, name: clean, parent });
@@ -274,11 +287,13 @@ const Store = (() => {
       persist();
       return {};
     },
-    // A dins d'una altra ('' = principal), però mai dins d'ella mateixa ni de les seves.
+    // A dins d'una principal ('' = passa a ser principal), però mai dins d'ella mateixa ni de les seves, i sense
+    // fer un tercer nivell (una que té subcategories no pot anar dins d'una altra).
     moveTag(id, parent) {
       const tag = findTag(id);
       if (!tag) return { error: 'tags.notFound' };
       if (parent && (!findTag(parent) || branchOf(id).includes(parent))) return { error: 'tags.loop' };
+      if (parent && (findTag(parent).parent || childrenOf(id).length)) return { error: 'tags.depth' };
       if (nameTaken(tag.name, parent, id)) return { error: 'tags.taken' };
       if (tag.parent !== parent) { // al lloc nou, va al final
         data.tags.splice(data.tags.indexOf(tag), 1);
@@ -309,6 +324,46 @@ const Store = (() => {
         if (list.length) data.cardTags[ch] = list;
         else delete data.cardTags[ch];
       });
+      persist();
+    },
+    // Una categoria pel camí de noms (['Calendari', 'Mesos']), sense mirar majúscules ni accents; null si no hi és.
+    findTagPath(names) {
+      let id = '';
+      for (const name of names) {
+        const tag = childrenOf(id).find(x => sameName(x.name, tagName(name)));
+        if (!tag) return null;
+        id = tag.id;
+      }
+      return id || null;
+    },
+    // El mateix, però crea les que falten (per a les categories que proposa Claude). null si algun nom és buit.
+    ensureTagPath(names) {
+      let id = '';
+      for (const name of names.slice(0, 2)) {
+        const tag = childrenOf(id).find(x => sameName(x.name, tagName(name)));
+        id = tag ? tag.id : this.addTag(name, id).id;
+        if (!id) return null;
+      }
+      return id || null;
+    },
+    // De tots aquests camins, els que s'haurien de crear, com a text i sense repetir: «Menjar», «Menjar › Fruita».
+    newTagLabels(paths) {
+      const labels = new Map();
+      paths.forEach(path => {
+        for (let depth = 1; depth <= Math.min(path.length, 2); depth++) {
+          const part = path.slice(0, depth);
+          const key = part.join('›').toLowerCase();
+          if (!labels.has(key) && !this.findTagPath(part)) labels.set(key, part.join(' › '));
+        }
+      });
+      return [...labels.values()];
+    },
+    // Afegeix categories a una fitxa (sense treure les que ja té).
+    addCardTags(ch, ids) {
+      if (findIndex(ch) < 0) return;
+      const list = [...new Set([...(data.cardTags[ch] || []), ...ids.filter(findTag)])];
+      if (!list.length) return;
+      data.cardTags[ch] = list;
       persist();
     },
     // Posa (on = true) o treu una etiqueta d'una fitxa.
