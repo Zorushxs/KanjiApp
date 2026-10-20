@@ -1,4 +1,4 @@
-// Utilitats generals: DOM, HTML segur, dates, kana → rōmaji, icones, clics i avisos.
+// Utilitats generals: DOM, HTML segur, dates, kana → rōmaji, icones, clics, avisos i la finestra de confirmar.
 // Les regles de les fitxes són a card.js, i els trossos d'HTML que comparteixen les pantalles, a peces.js.
 const U = (() => {
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -150,10 +150,31 @@ const U = (() => {
     toastTimer = setTimeout(() => { el.hidden = true; }, Math.max(3500, message.length * 60));
   }
 
+  // Finestra modal per confirmar una acció. Torna una promesa: true si prems ok; false si prems cancel, Esc o
+  // toques fora. El focus comença a cancel, perquè un Enter sense voler no faci res.
+  function ask({ title, text, ok, cancel }) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'ask';
+    dialog.innerHTML = html`<form method="dialog">
+        <h2>${title}</h2>${text ? html`<p>${text}</p>` : ''}
+        <div class="ask-btns"><button value="no" class="btn">${cancel}</button><button value="yes" class="btn primary">${ok}</button></div>
+      </form>`;
+    document.body.append(dialog);
+    return new Promise(resolve => {
+      dialog.addEventListener('close', () => {
+        resolve(dialog.returnValue === 'yes');
+        dialog.remove();
+      });
+      dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close('no'); }); // fora del quadre
+      dialog.showModal();
+      dialog.querySelector('[value="no"]').focus();
+    });
+  }
+
   return {
     $, esc, html, raw, join, onActions,
     iso, today, addDays, fmtDate,
     hira, romaji,
-    shuffle, ICON, toast,
+    shuffle, ICON, toast, ask,
   };
 })();

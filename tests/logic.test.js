@@ -339,6 +339,12 @@ ok(Store.tagTree().length === 3, 'norm: sense cercles (A dins de B dins de A)');
 ok(JSON.stringify(Store.snapshot().cardTags) === '{"日":["t1"]}', 'norm: etiquetes de fitxes que existeixen, sense repetir');
 ok(Store.addTag('F').id === 't5', 'id nou: el següent al més alt');
 
+// Verificar de cop: només les que estan per verificar (les que tenen errors no es toquen)
+Store.load({ kanji: ['一', '二', '三', '四'].map(k => ({ ...good, kanji: k, verified: false })) });
+Store.setVerified('二', 'error'); Store.setVerified('三', true);
+ok(Store.verifyPending(['一', '二', '三', 'zz']) === 1, 'verifyPending: en canvia una');
+ok(['一', '二', '三', '四'].map(k => String(Store.get(k).verified)).join() === 'true,error,true,false', 'verifyPending: errors i les de fora de la llista, igual');
+
 // Prefs: preferències del navegador
 Prefs.set('theme', 'dark');
 Prefs.set('practice', { size: 20 });

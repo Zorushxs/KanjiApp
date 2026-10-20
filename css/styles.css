@@ -249,6 +249,9 @@ button.ghost:hover { color: var(--ink); background: var(--hover); }
 .tile:hover { border-color: var(--accent); transform: translateY(-1px); }
 /* Ordenar arrossegant (només a l'ordinador): botó «Reordenar [R]» a la dreta de «Mostrar». En mode ordenar,
    les rajoles tenen la vora discontínua, el text no es pot seleccionar i la que mous queda com un forat. */
+/* «✓ Verificar totes (N)»: a la dreta; si també hi ha «Reordenar», van junts. */
+.view-opts .verify-all-btn { margin-left: auto; color: var(--ok); font-size: 14px; }
+.view-opts .verify-all-btn:not([hidden]) + .sort-btn { margin-left: 0; }
 .view-opts .sort-btn { margin-left: auto; color: var(--ink); font-size: 14px; }
 .sort-btn kbd {
   margin-left: 4px;
@@ -895,6 +898,22 @@ h2 + .tags-form { margin-top: 0; }
 }
 .tile-pick[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .tile-pick[aria-pressed="true"] .tile-check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* ---------- Finestra de confirmar (U.ask) ---------- */
+.ask {
+  width: min(420px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 20px 50px -20px rgb(0 0 0 / .5);
+}
+.ask::backdrop { background: rgb(0 0 0 / .45); }
+.ask form { padding: 20px; }
+.ask h2 { margin: 0 0 8px; font: 700 19px/1.3 var(--serif); }
+.ask p { margin: 0; color: var(--mute); font-size: 15px; }
+.ask-btns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
 /* ---------- Avisos ---------- */
 .toast {

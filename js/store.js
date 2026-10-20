@@ -196,6 +196,15 @@ const Store = (() => {
       card.verified = Card.VERIFIED.includes(verified) ? verified : false;
       persist();
     },
+    // Marca com a verificades les fitxes de la llista que estan per verificar (les que tenen errors no es toquen).
+    // Torna quantes n'ha canviat.
+    verifyPending(chs) {
+      const wanted = new Set(chs);
+      const pending = data.kanji.filter(card => wanted.has(card.kanji) && card.verified === false);
+      pending.forEach(card => { card.verified = true; });
+      if (pending.length) persist();
+      return pending.length;
+    },
     // Nou ordre per a les fitxes de la llista (arrossegant-les a l'inici). Si hi ha un filtre, només es
     // mouen entre els llocs que ocupaven: les que no es veuen es queden on eren.
     reorder(order) {

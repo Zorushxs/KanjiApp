@@ -91,6 +91,7 @@ const Inici = (() => {
       </div>
       <div class="view-opts"><span>${t('home.show')}</span>
         ${viewSwitch('meanings', t('home.showMeanings'))}${viewSwitch('romaji', t('home.showRomaji'))}
+        <button type="button" class="tag tag-btn verify-all-btn" data-act="verifyAll" hidden></button>
         ${canSort() ? sortButton() : ''}</div>
       <p class="found" aria-live="polite"></p>
       <div class="grid${Prefs.view('meanings') ? '' : ' hide-m'}"></div>`;
@@ -101,6 +102,14 @@ const Inici = (() => {
       grid.innerHTML = html`${list.map(card => Peces.tile(card, day))}`;
       if (list.length === all.length) found.textContent = '';
       else found.textContent = list.length ? t('home.count', { n: list.length, total: all.length }) : t('home.none');
+      paintVerifyAll(list);
+    }
+    // «✓ Verificar totes (N)»: només si n'hi ha de per verificar entre les que es veuen.
+    const verifyAll = root.querySelector('.verify-all-btn');
+    function paintVerifyAll(list) {
+      const n = list.filter(card => card.verified === false).length;
+      verifyAll.hidden = !n;
+      verifyAll.textContent = '✓ ' + t('home.verifyAll', { n });
     }
     screen = root;
     state.sorting = false;
@@ -149,6 +158,22 @@ const Inici = (() => {
       },
       sort() {
         setSorting(!state.sorting);
+      },
+      // Verifica de cop les que es veuen i estan per verificar, després de confirmar-ho en una finestra.
+      async verifyAll() {
+        const list = visible(), n = list.filter(card => card.verified === false).length;
+        if (!n) return;
+        const filtered = list.length < all.length;
+        const sure = await U.ask({
+          title: t('home.verifyAskTitle', { n }),
+          text: t(filtered ? 'home.verifyAskFiltered' : 'home.verifyAskAll'),
+          ok: t('home.verifyAskOk', { n }),
+          cancel: t('card.cancel'),
+        });
+        if (!sure) return;
+        const done = Store.verifyPending(list.map(card => card.kanji));
+        paintGrid();
+        U.toast(t('home.verifiedAll', { n: done }));
       },
       pref(toggle) {
         if (toggle.dataset.pref === 'romaji') {
