@@ -599,8 +599,11 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     ok(JSON.parse(localStorage.getItem('kanji:vista')).byCategory === true && $('.grid').hidden && !$('.cat-view').hidden
       && heads() === 'Sense categoria', 'per categories (es recorda), sense cap categoria: només «Sense categoria»');
     ok(head('Sense categoria').getAttribute('aria-expanded') === 'false' && !$('.cat-view .tile'), 'els grups comencen plegats');
+    const widthClosed = D().documentElement.clientWidth;
     head('Sense categoria').click(); await sleep(30);
     ok($$('.cat-view .tile').length === S.kanji.length && D().activeElement === head('Sense categoria'), 'en obrir-lo, les fitxes');
+    ok(W().getComputedStyle(D().documentElement).overflowY === 'scroll' && D().documentElement.clientWidth === widthClosed,
+      'obrir un grup no canvia l’amplada de la pàgina (la barra sempre hi és): ' + widthClosed + ' → ' + D().documentElement.clientWidth);
     head('Sense categoria').click(); await sleep(30);
     ok(!$('.cat-view .tile'), 'i es torna a plegar');
     $('.home-cats-edit').click(); await sleep(150);

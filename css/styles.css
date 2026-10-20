@@ -24,7 +24,10 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { -webkit-text-size-adjust: 100%; }
+/* La barra de desplaçament sempre hi és (a les pàgines curtes, sense moure's): si no, quan la pàgina es fa més
+   llarga (obrir un grup, pintar més fitxes) la barra apareix, l'amplada canvia i tot parpelleja. scrollbar-gutter
+   a l'arrel no ho evita a Chrome; overflow-y: scroll, sí. Al mòbil la barra va per sobre i no canvia res. */
+html { -webkit-text-size-adjust: 100%; overflow-y: scroll; }
 body {
   margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
   background: var(--bg); color: var(--ink); font: 16px/1.5 var(--sans);
