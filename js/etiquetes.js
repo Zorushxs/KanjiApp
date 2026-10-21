@@ -154,8 +154,9 @@ const Etiquetes = (() => {
   // oberta ('' a la llista); si és principal, a sota hi ha el formulari per crear-hi subcategories.
   function treePanel(current) {
     const canHaveSubs = current && !Store.tag(current).parent;
-    return html`<section class="panel tags-panel"><h2>${t('tags.all')}</h2>${untaggedRow()}${treeList(current)}${
-      canHaveSubs ? createForm(current) : ''}</section>`;
+    return html`<section class="panel tags-panel"><h2>${t('tags.all')}</h2>
+        ${Store.tags.length ? html`<div class="chips tags-order-row">${Peces.orderChips()}</div>` : ''}
+        ${untaggedRow()}${treeList(current)}${canHaveSubs ? createForm(current) : ''}</section>`;
   }
   // Què fan els botons de l'arbre: «Sense categoria», anar a una categoria i canviar l'ordre (↑ ↓).
   function treeActions(root) {
@@ -168,6 +169,12 @@ const Etiquetes = (() => {
       (same && !same.disabled ? same : other).focus();
     };
     return {
+      // El teu ordre o A-Z (en A-Z no hi ha ↑ ↓).
+      catOrder(chip) {
+        Prefs.view('alphaCategories', chip.dataset.alpha === 'true');
+        render(root, state.current);
+        root.querySelector(`[data-act="catOrder"][data-alpha="${chip.dataset.alpha}"]`).focus();
+      },
       untagged(link, e) {
         e.preventDefault();
         Inici.showGroup(Inici.UNTAGGED);
@@ -188,13 +195,13 @@ const Etiquetes = (() => {
     const n = Store.kanji.filter(card => !Store.cardTags(card.kanji).length).length;
     return html`<ul class="tags-tree tags-untagged"><li><a href="#/" data-act="untagged">
         <span>${t('tags.untagged')} <em>${t('tags.auto')}</em></span><small>${n}</small></a>
-        <span class="tags-order" aria-hidden="true"></span></li></ul>`;
+        ${Prefs.view('alphaCategories') ? '' : html`<span class="tags-order" aria-hidden="true"></span>`}</li></ul>`;
   }
 
   // Cada categoria amb quantes fitxes té (comptant les de dins) i els botons ↑ ↓ per canviar-ne l'ordre entre
-  // les que són al mateix lloc. La primera no pot pujar i l'última no pot baixar.
+  // les que són al mateix lloc. La primera no pot pujar i l'última no pot baixar. En A-Z no n'hi ha.
   function treeList(current) {
-    const tree = Store.tagTree();
+    const tree = Store.tagTree(), alpha = Prefs.view('alphaCategories');
     if (!tree.length) return html`<p class="hint">${t('tags.none')}</p>`;
     const item = ({ tag, depth }) => {
       const siblings = Store.tagChildren(tag.parent), i = siblings.indexOf(tag), on = tag.id === current;
@@ -203,7 +210,8 @@ const Etiquetes = (() => {
       return html`<li style="--depth: ${depth}"${on ? html` class="on"` : ''}>
           <a href="#/etiquetes/${tag.id}" data-act="go"${on ? html` aria-current="page"` : ''}><span>${tag.name}</span>
             <small>${Store.cardsInTag(tag.id).length}</small></a>
-          <span class="tags-order">${move('up', '↑', t('tags.up'), i === 0)}${move('down', '↓', t('tags.down'), i === siblings.length - 1)}</span>
+          ${alpha ? '' : html`<span class="tags-order">${move('up', '↑', t('tags.up'), i === 0)}${
+            move('down', '↓', t('tags.down'), i === siblings.length - 1)}</span>`}
         </li>`;
     };
     return html`<ul class="tags-tree">${tree.map(item)}</ul>`;

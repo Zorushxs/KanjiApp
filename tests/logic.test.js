@@ -371,6 +371,24 @@ ok(catPrompt.includes('日 (にち): ' + I18n.list(good.meanings).join(', ')) &&
 Store.load({ kanji: [good] });
 ok(Prompt.cards(['月']).includes(`I don't have any categories yet`), 'prompt sense categories');
 
+// Ordre de les categories: arrossegar (reorderTags) i A-Z, que només canvia com es mostren
+Store.load({ kanji: [good], tags: [{ id: 't1', name: 'Temps', parent: '' }, { id: 't2', name: 'mesos', parent: 't1' },
+  { id: 't3', name: 'Animals', parent: '' }, { id: 't4', name: 'Dies', parent: 't1' }, { id: 't5', name: 'Números 10', parent: '' },
+  { id: 't6', name: 'Números 2', parent: '' }] });
+const names = list => list.map(x => x.name).join();
+Store.reorderTags(['t5', 't1', 't6', 't3']);
+ok(names(Store.tagChildren('')) === 'Números 10,Temps,Números 2,Animals' && names(Store.tagChildren('t1')) === 'mesos,Dies', 'reorderTags: les principals');
+Store.reorderTags(['t1', 't4']);
+ok(names(Store.tagChildren('')) === 'Números 10,Temps,Números 2,Animals', 'reorderTags: si no són germanes, no fa res');
+Store.reorderTags(['t4', 't2']);
+ok(names(Store.tagChildren('t1')) === 'Dies,mesos', 'reorderTags: les subcategories');
+Prefs.view('alphaCategories', true);
+ok(names(Store.tagChildren('')) === 'Animals,Números 2,Números 10,Temps' && names(Store.tagChildren('t1')) === 'Dies,mesos'
+  && Store.tagTree().map(x => x.tag.name).join() === 'Animals,Números 2,Números 10,Temps,Dies,mesos', 'A-Z: alfabètic, amb els números en ordre');
+Store.shiftTag('t3', -1);
+Prefs.view('alphaCategories', false);
+ok(names(Store.tagChildren('')) === 'Números 10,Temps,Animals,Números 2', 'el teu ordre es manté (i ↑ ↓ el mouen, encara que es vegi en A-Z)');
+
 // Verificar de cop: només les que estan per verificar (les que tenen errors no es toquen)
 Store.load({ kanji: ['一', '二', '三', '四'].map(k => ({ ...good, kanji: k, verified: false })) });
 Store.setVerified('二', 'error'); Store.setVerified('三', true);

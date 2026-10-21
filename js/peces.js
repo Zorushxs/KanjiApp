@@ -87,5 +87,14 @@ const Peces = (() => {
     </button>`;
   }
 
-  return { ro, roList, setRomaji, romajiBtn, kun, readingList, mainHtml, mark, say, tile, pickTile };
+  // «Ordre: El meu | A-Z» de les categories (a l'inici i a la pantalla de categories). Es recorda i val a tot arreu.
+  function orderChips() {
+    const alpha = Prefs.view('alphaCategories');
+    const chip = (value, label) => html`<button type="button" class="chip${value === alpha ? ' on' : ''}" data-act="catOrder"
+      data-alpha="${value}" aria-pressed="${value === alpha}">${label}</button>`;
+    return html`<span class="cat-order"><span class="cat-order-l">${t('cats.order')}</span>${chip(false, t('cats.orderMine'))}${
+      chip(true, 'A-Z')}</span>`;
+  }
+
+  return { ro, roList, setRomaji, romajiBtn, kun, readingList, mainHtml, mark, say, tile, pickTile, orderChips };
 })();

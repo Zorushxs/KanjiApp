@@ -660,6 +660,45 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     $('.cat-all').click(); await sleep(30);
     ok($$('.cat-head').every(h => h.getAttribute('aria-expanded') === 'false') && heads() === 'Sense categoria,Temps'
       && $('.cat-all').textContent === 'Desplegar totes', 'plegar totes');
+
+    // Ordre de les categories: arrossegar-les amb R (ordinador) i A-Z
+    const tId = S.tags.find(x => x.name === 'Temps').id, numsId = S.tags.find(x => x.name === 'Números').id;
+    const diesId = S.addTag('Dies', tId).id;
+    await go('#/calendari'); await go('#/');
+    ok($('.cat-tools .cat-order') && $('[data-act="catOrder"][data-alpha="false"]').getAttribute('aria-pressed') === 'true', 'ordre: el meu per defecte');
+    ok(!$('.sort-btn').hidden, 'per categories, «Reordenar» també hi és');
+    key('r'); await sleep(30);
+    const sortNames = () => $$('.cat-sortable .cat-name').map(x => x.textContent).join();
+    const catOf = name => $$('.cat-sortable .cat').find(c => c.querySelector('.cat-name').textContent === name);
+    ok($('.cat-sortable') && sortNames() === 'Temps,Mesos,Dies,Números' && !$('.cat-sortable .tile') && !$('.cat-tools')
+      && /Arrossega les categories/.test($('#toast').textContent), 'R: totes les capçaleres (també les buides), sense fitxes');
+    drag(catOf('Números'), catOf('Temps'));
+    ok(S.tagChildren('').map(x => x.name).join() === 'Números,Temps' && sortNames() === 'Números,Temps,Mesos,Dies', 'arrossegar Números sobre Temps');
+    drag(catOf('Dies'), catOf('Mesos'));
+    ok(S.tagChildren(tId).map(x => x.name).join() === 'Dies,Mesos', 'una subcategoria, dins de la seva');
+    drag(catOf('Dies'), catOf('Números'));
+    ok(S.tagChildren(tId).map(x => x.name).join() === 'Dies,Mesos' && S.tag(diesId).parent === tId, 'una subcategoria no surt de la seva categoria');
+    drag(catOf('Temps'), catOf('Números'), true);
+    ok(S.tagChildren('').map(x => x.name).join() === 'Números,Temps' && sortNames() === 'Números,Temps,Dies,Mesos', 'arrossegar i cancel·lar: no canvia res');
+    key('Escape'); await sleep(30);
+    ok(!$('.cat-sortable') && $('.cat-head') && $('.sort-btn').getAttribute('aria-pressed') === 'false', 'Esc: torna als grups');
+    S.reorderTags([tId, numsId]);
+    S.reorderTags([mesosId, diesId]); // el meu ordre: Temps (Mesos, Dies), Números; en A-Z és diferent
+    $('[data-act="catOrder"][data-alpha="true"]').click(); await sleep(30);
+    ok(JSON.parse(localStorage.getItem('kanji:vista')).alphaCategories === true && $('.sort-btn').hidden
+      && S.tagTree().map(x => x.tag.name).join() === 'Números,Temps,Dies,Mesos', 'A-Z: es recorda, i en A-Z no es pot reordenar');
+    key('r'); await sleep(30);
+    ok(!$('.cat-sortable'), 'en A-Z, la R no fa res');
+    await go('#/etiquetes');
+    ok($('[data-act="catOrder"][data-alpha="true"]').getAttribute('aria-pressed') === 'true' && !$('.tags-move')
+      && $$('.tags-tree:not(.tags-untagged) li a span').map(x => x.textContent).join() === 'Números,Temps,Dies,Mesos',
+      'a la pantalla de categories també A-Z, sense ↑ ↓');
+    $('[data-act="catOrder"][data-alpha="false"]').click(); await sleep(30);
+    ok($('.tags-move') && $$('.tags-tree:not(.tags-untagged) li a span').map(x => x.textContent).join() === 'Temps,Mesos,Dies,Números'
+      && JSON.parse(localStorage.getItem('kanji:vista')).alphaCategories === false, 'tornar al meu ordre');
+    S.reorderTags([tId, numsId]);
+    S.removeTag(diesId);
+    await go('#/');
     type($('.search'), 'foc');
     ok(heads() === 'Sense categoria' && head('Sense categoria').getAttribute('aria-expanded') === 'true'
       && $$('.cat-view .tile').map(x => x.dataset.k).join() === '火' && !$('.cat-all'),

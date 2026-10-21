@@ -5,7 +5,7 @@ const Prefs = (() => {
     theme: 'kanji:tema',        // 'light' | 'dark' (index.html també el llegeix abans de pintar)
     lang: 'kanji:idioma',       // 'ca' | 'es' | 'en'
     notice: 'kanji:avis',       // has amagat l'avís de «no es pot desar en un arxiu»
-    view: 'kanji:vista',        // { meanings, romaji, byCategory }: què es mostra a l'app
+    view: 'kanji:vista',        // { meanings, romaji, byCategory, alphaCategories }: què es mostra a l'app
     practice: 'kanji:practica', // opcions de la pantalla Practicar
     add: 'kanji:afegir',        // mode de la pantalla Afegir
   };
@@ -27,9 +27,10 @@ const Prefs = (() => {
     try { localStorage.setItem(KEYS[name], text); } catch {}
   }
 
-  // Què es mostra: significats a la graella, rōmaji a tota l'app i, a l'inici, totes les fitxes o per categories.
+  // Què es mostra: significats a la graella, rōmaji a tota l'app, a l'inici totes les fitxes o per categories, i les
+  // categories en el teu ordre o A-Z (a tot arreu).
   // view('romaji') llegeix; view('romaji', false) desa i torna el valor nou.
-  const VIEW_DEFAULT = { meanings: true, romaji: true, byCategory: false };
+  const VIEW_DEFAULT = { meanings: true, romaji: true, byCategory: false, alphaCategories: false };
   const savedView = get('view');
   const viewPrefs = { ...VIEW_DEFAULT, ...(typeof savedView === 'object' ? savedView : {}) };
   function view(key, value) {

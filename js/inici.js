@@ -11,6 +11,7 @@ const Inici = (() => {
     sorting: false, // mode «Reordenar» (només a l'ordinador): les fitxes es poden arrossegar
   };
   let screen = null; // la pantalla pintada, per a les tecles
+  let repaint = null; // torna a pintar les fitxes de la pantalla (per al mode «Reordenar» per categories)
   // «Sense categoria»: no es desa enlloc, es calcula cada vegada (els ids de les categories són t1, t2…).
   const UNTAGGED = 'none';
   const untagged = card => !Store.cardTags(card.kanji).length;
@@ -77,13 +78,14 @@ const Inici = (() => {
       <div class="home-cards${Prefs.view('meanings') ? '' : ' hide-m'}"><div class="grid"></div><div class="cat-view"></div></div>`;
 
     const grid = root.querySelector('.grid'), catView = root.querySelector('.cat-view'), found = root.querySelector('.found');
-    // Totes en una graella, o per categories (aquí no es pot reordenar arrossegant).
+    // Totes en una graella, o per categories. «Reordenar» mou les fitxes o, per categories, les categories (en
+    // A-Z no, perquè l'ordre és l'alfabètic).
     function paintGrid() {
       const list = visible(), byCategory = Prefs.view('byCategory');
       grid.hidden = byCategory;
       catView.hidden = !byCategory;
       const sortBtn = root.querySelector('.sort-btn');
-      if (sortBtn) sortBtn.hidden = byCategory;
+      if (sortBtn) sortBtn.hidden = byCategory && Prefs.view('alphaCategories');
       // La vista amagada es buida, perquè no hi quedin rajoles velles.
       catView.innerHTML = byCategory ? categoryGroups(list, day) : '';
       grid.innerHTML = byCategory ? '' : html`${list.map(card => Peces.tile(card, day))}`;
@@ -99,9 +101,13 @@ const Inici = (() => {
       verifyAll.textContent = '✓ ' + t('home.verifyAll', { n });
     }
     screen = root;
+    repaint = paintGrid;
     state.sorting = false;
     paintGrid();
-    if (canSort()) sortable(grid, paintGrid);
+    if (canSort()) {
+      sortable(grid, paintGrid);
+      sortableCategories(catView, paintGrid);
+    }
 
     root.querySelector('.search').oninput = e => {
       state.query = e.target.value;
@@ -144,6 +150,13 @@ const Inici = (() => {
         paintGrid();
         root.querySelector('.cat-all').focus();
       },
+      // Categories en el teu ordre o A-Z (es recorda i val a tot arreu).
+      catOrder(chip) {
+        if (state.sorting) setSorting(false);
+        Prefs.view('alphaCategories', chip.dataset.alpha === 'true');
+        paintGrid();
+        root.querySelector(`[data-act="catOrder"][data-alpha="${chip.dataset.alpha}"]`).focus();
+      },
       sort() {
         setSorting(!state.sorting);
       },
@@ -184,10 +197,12 @@ const Inici = (() => {
   const sortButton = () => html`<button type="button" class="tag tag-btn sort-btn" data-act="sort"
     aria-pressed="${state.sorting}" title="${t('home.sortHint')}">${t('home.sort')} <kbd>R</kbd></button>`;
   function setSorting(on) {
+    const byCategory = Prefs.view('byCategory');
     state.sorting = on;
-    screen.querySelector('.grid').classList.toggle('sortable', on);
+    screen.querySelector('.grid').classList.toggle('sortable', on && !byCategory);
     screen.querySelector('.sort-btn').setAttribute('aria-pressed', on);
-    if (on) U.toast(t('home.sortHint'));
+    if (byCategory) repaint(); // les categories es pinten com una llista de capçaleres per arrossegar
+    if (on) U.toast(t(byCategory ? 'home.sortCatsHint' : 'home.sortHint'));
   }
   function key(e) {
     if (!screen || !screen.querySelector('.sort-btn:not([hidden])')) return;
@@ -238,6 +253,44 @@ const Inici = (() => {
     });
   }
 
+  // Per categories, en mode «Reordenar»: agafes una categoria i la mous entre les altres principals, o una
+  // subcategoria entre les de la seva categoria (per canviar-la de categoria hi ha «Moure», a la pantalla de
+  // categories). En deixar-la anar es desa l'ordre; si la deixes fora (o prems Esc), tot torna com era.
+  function sortableCategories(view, repaint) {
+    let dragged = null, dropped = false;
+    view.addEventListener('dragstart', e => {
+      if (!state.sorting) return;
+      dragged = e.target.closest('.cat[draggable="true"]');
+      if (!dragged) return;
+      dropped = false;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragged.dataset.group);
+      setTimeout(() => dragged && dragged.classList.add('dragging'));
+    });
+    view.addEventListener('dragover', e => {
+      if (!dragged) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const siblings = [...dragged.parentElement.children];
+      const target = siblings.find(el => el !== dragged && el.contains(e.target));
+      if (!target) return;
+      const after = siblings.indexOf(dragged) < siblings.indexOf(target);
+      target.insertAdjacentElement(after ? 'afterend' : 'beforebegin', dragged);
+    });
+    view.addEventListener('drop', e => {
+      e.preventDefault();
+      dropped = true;
+    });
+    view.addEventListener('dragend', () => {
+      if (!dragged) return;
+      const list = dragged.parentElement;
+      dragged.classList.remove('dragging');
+      dragged = null;
+      if (!dropped) repaint();
+      else Store.reorderTags([...list.children].map(el => el.dataset.group));
+    });
+  }
+
   // Per repassar avui, noves i total, i el botó de practicar.
   function todayStats(all, day) {
     const due = all.filter(card => Store.isDue(card.kanji, day)).length;
@@ -275,6 +328,7 @@ const Inici = (() => {
   // seves subcategories, també plegables. Només compten les fitxes que es veuen amb la cerca i els filtres, i els
   // grups buits no surten; mentre cerques, tots estan oberts. Una fitxa amb dues categories surt a totes dues.
   function categoryGroups(list, day) {
+    if (state.sorting) return sortTree();
     const shown = new Set(list), searching = !!state.query.trim();
     const isOpen = id => searching || state.open.has(id);
     const tiles = cards => (cards.length ? html`<div class="grid">${cards.map(card => Peces.tile(card, day))}</div>` : '');
@@ -297,7 +351,20 @@ const Inici = (() => {
         () => html`${tiles(direct(tag.id))}${Store.tagChildren(tag.id).map(subGroup)}`)),
     ];
     if (!groups.some(Boolean)) return '';
-    return html`${searching ? '' : openAllButton(list)}${groups}`;
+    return html`<div class="cat-tools">${Peces.orderChips()}${searching ? '' : openAllButton(list)}</div>${groups}`;
+  }
+  // Mode «Reordenar»: totes les categories (també les que ara no tenen fitxes que es vegin), només les capçaleres,
+  // i cada principal amb les seves subcategories a dins. «Sense categoria» no hi surt: sempre va la primera.
+  function sortTree() {
+    const item = (tag, sub) => {
+      const subs = sub ? [] : Store.tagChildren(tag.id);
+      return html`<section class="cat${sub ? ' cat-sub' : ''}" draggable="true" data-group="${tag.id}">
+          <div class="cat-head cat-drag"><span class="cat-name">${tag.name}</span>
+            <span class="cat-n">${Store.cardsInTag(tag.id).length}</span></div>
+          ${subs.length ? html`<div class="cat-body cat-subs">${subs.map(x => item(x, true))}</div>` : ''}
+        </section>`;
+    };
+    return html`<div class="cat-sortable">${Store.tagChildren('').map(tag => item(tag, false))}</div>`;
   }
   // Els grups que surten (els que tenen alguna fitxa de les que es veuen), amb les subcategories.
   function groupIds(list) {
@@ -309,8 +376,8 @@ const Inici = (() => {
   // «Desplegar totes» si n'hi ha alguna de plegada; «Plegar totes» si ja estan totes obertes.
   function openAllButton(list) {
     const allOpen = groupIds(list).every(id => state.open.has(id));
-    return html`<div class="cat-tools"><button type="button" class="tag tag-btn cat-all" data-act="groupsAll"
-      aria-pressed="${allOpen}">${t(allOpen ? 'home.closeAll' : 'home.openAll')}</button></div>`;
+    return html`<button type="button" class="tag tag-btn cat-all" data-act="groupsAll"
+      aria-pressed="${allOpen}">${t(allOpen ? 'home.closeAll' : 'home.openAll')}</button>`;
   }
 
   function setPressed(chip, on) {

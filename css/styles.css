@@ -827,9 +827,21 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .home-cats-edit { margin-left: auto; color: var(--mute); font-size: 13.5px; }
 /* Grups plegables: la capçalera és un botó a tota l'amplada, amb el nom, quantes fitxes i una marca que gira. */
 .cat-view { display: grid; gap: 8px; }
-/* «Desplegar totes / Plegar totes»: a la dreta, amb una amplada mínima perquè no salti en canviar el text. */
-.cat-tools { display: flex; justify-content: flex-end; }
-.cat-all { min-width: 9.5em; text-align: center; font-size: 14px; }
+/* «Ordre: El meu | A-Z» a l'esquerra i «Desplegar totes / Plegar totes» a la dreta, amb una amplada mínima perquè
+   no salti en canviar el text. */
+.cat-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.cat-all { min-width: 9.5em; margin: 0 0 0 auto; text-align: center; font-size: 14px; }
+.cat-order { display: flex; align-items: center; gap: 6px; }
+.cat-order-l { font-size: 13.5px; font-weight: 600; color: var(--mute); }
+.tags-order-row { margin: -2px 0 10px; }
+/* Mode «Reordenar» per categories (ordinador): només les capçaleres, amb la vora discontínua; la que mous queda
+   com un forat. */
+.cat-sortable { display: grid; gap: 8px; }
+.cat-sortable .cat { cursor: grab; border-style: dashed; user-select: none; -webkit-user-select: none; }
+.cat-sortable .cat-head:hover { background: none; }
+.cat-sortable .cat-head::before { display: none; }
+.cat-sortable .cat.dragging { opacity: .35; border-color: var(--accent); }
+.cat-subs { padding-top: 0; }
 .cat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
 .cat-head {
   display: flex;

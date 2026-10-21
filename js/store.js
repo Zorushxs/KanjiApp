@@ -146,6 +146,10 @@ const Store = (() => {
   const sameName = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }) === 0;
   // Les de dins d'una etiqueta, en l'ordre que has triat (el de la llista "tags"; les noves, al final).
   const childrenOf = parent => data.tags.filter(tag => tag.parent === parent);
+  // Com es mostren: en el teu ordre o, si ho has triat (Prefs: «Ordre: A-Z»), per ordre alfabètic, amb els
+  // números en ordre (2 abans que 10). L'A-Z només és per mirar: el teu ordre es manté.
+  const byName = (a, b) => a.name.localeCompare(b.name, I18n.lang, { numeric: true, sensitivity: 'base' });
+  const shownChildren = parent => (Prefs.view('alphaCategories') ? childrenOf(parent).sort(byName) : childrenOf(parent));
   // L'etiqueta i totes les de dins (i les de dins d'aquestes…).
   function branchOf(id) {
     if (!findTag(id)) return [];
@@ -237,8 +241,8 @@ const Store = (() => {
     // ---------- Etiquetes ----------
     get tags() { return data.tags; },
     tag: findTag,
-    // Les de dins d'una etiqueta ('' = les principals), en l'ordre que has triat.
-    tagChildren: childrenOf,
+    // Les de dins d'una categoria ('' = les principals), tal com es mostren (el teu ordre o A-Z).
+    tagChildren: shownChildren,
     tagBranch: branchOf,
     // De la principal fins a aquesta: [Temps, Mesos].
     tagPath(id) {
@@ -251,7 +255,7 @@ const Store = (() => {
     // Totes, en arbre: cada una seguida de les de dins, amb la fondària (0 = principal).
     tagTree() {
       const tree = [];
-      const walk = (parent, depth) => childrenOf(parent).forEach(tag => {
+      const walk = (parent, depth) => shownChildren(parent).forEach(tag => {
         tree.push({ tag, depth });
         walk(tag.id, depth + 1);
       });
@@ -312,6 +316,16 @@ const Store = (() => {
       const a = data.tags.indexOf(tag), b = data.tags.indexOf(other);
       data.tags[a] = other;
       data.tags[b] = tag;
+      persist();
+    },
+    // Nou ordre per a unes categories germanes (arrossegant-les a l'inici): ocupen els mateixos llocs de la llista,
+    // en l'ordre nou. Si no són totes del mateix pare, no es fa res.
+    reorderTags(ids) {
+      const tags = ids.map(findTag);
+      if (!tags.length || tags.some(tag => !tag) || new Set(tags.map(tag => tag.parent)).size !== 1) return;
+      const slots = tags.map(tag => data.tags.indexOf(tag)).sort((a, b) => a - b);
+      if (slots.every((slot, i) => data.tags[slot] === tags[i])) return;
+      slots.forEach((slot, i) => { data.tags[slot] = tags[i]; });
       persist();
     },
     // Esborra l'etiqueta i les de dins, i les treu de les fitxes (les fitxes no s'esborren).
