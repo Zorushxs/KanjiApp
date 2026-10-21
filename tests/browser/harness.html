@@ -652,9 +652,18 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
       'Temps obert: la subcategoria, plegada');
     head('Mesos').click(); await sleep(30);
     ok(head('Mesos').closest('.cat').querySelector('.tile').dataset.k === '月', 'Mesos obert: 月');
+    ok($('.cat-all') && $('.cat-all').textContent === 'Desplegar totes' && $('.cat-all').getAttribute('aria-pressed') === 'false',
+      'botó «Desplegar totes» (n’hi ha de plegades)');
+    $('.cat-all').click(); await sleep(30);
+    ok($$('.cat-head').every(h => h.getAttribute('aria-expanded') === 'true') && heads() === 'Sense categoria,Temps,Mesos'
+      && $('.cat-all').textContent === 'Plegar totes' && D().activeElement === $('.cat-all'), 'desplegar totes, també les subcategories');
+    $('.cat-all').click(); await sleep(30);
+    ok($$('.cat-head').every(h => h.getAttribute('aria-expanded') === 'false') && heads() === 'Sense categoria,Temps'
+      && $('.cat-all').textContent === 'Desplegar totes', 'plegar totes');
     type($('.search'), 'foc');
     ok(heads() === 'Sense categoria' && head('Sense categoria').getAttribute('aria-expanded') === 'true'
-      && $$('.cat-view .tile').map(x => x.dataset.k).join() === '火', 'cercant: només els grups amb resultats, oberts');
+      && $$('.cat-view .tile').map(x => x.dataset.k).join() === '火' && !$('.cat-all'),
+      'cercant: només els grups amb resultats, oberts (i sense el botó de desplegar-les)');
     type($('.search'), 'temps');
     ok(heads() === 'Temps,Mesos' && $$('.cat-view .tile').map(x => x.dataset.k).join() === '月', 'el cercador troba per categoria');
     type($('.search'), '');

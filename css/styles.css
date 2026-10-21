@@ -827,6 +827,9 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .home-cats-edit { margin-left: auto; color: var(--mute); font-size: 13.5px; }
 /* Grups plegables: la capçalera és un botó a tota l'amplada, amb el nom, quantes fitxes i una marca que gira. */
 .cat-view { display: grid; gap: 8px; }
+/* «Desplegar totes / Plegar totes»: a la dreta, amb una amplada mínima perquè no salti en canviar el text. */
+.cat-tools { display: flex; justify-content: flex-end; }
+.cat-all { min-width: 9.5em; text-align: center; font-size: 14px; }
 .cat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
 .cat-head {
   display: flex;

@@ -136,6 +136,14 @@ const Inici = (() => {
         paintGrid();
         root.querySelector(`.cat-head[data-group="${id}"]`).focus();
       },
+      // Desplega o plega tots els grups (també les subcategories).
+      groupsAll() {
+        const ids = groupIds(visible());
+        if (ids.every(id => state.open.has(id))) state.open.clear();
+        else ids.forEach(id => state.open.add(id));
+        paintGrid();
+        root.querySelector('.cat-all').focus();
+      },
       sort() {
         setSorting(!state.sorting);
       },
@@ -288,7 +296,21 @@ const Inici = (() => {
       ...Store.tagChildren('').map(tag => group(tag.id, tag.name, inBranch(tag.id),
         () => html`${tiles(direct(tag.id))}${Store.tagChildren(tag.id).map(subGroup)}`)),
     ];
-    return groups.some(Boolean) ? html`${groups}` : '';
+    if (!groups.some(Boolean)) return '';
+    return html`${searching ? '' : openAllButton(list)}${groups}`;
+  }
+  // Els grups que surten (els que tenen alguna fitxa de les que es veuen), amb les subcategories.
+  function groupIds(list) {
+    const shown = new Set(list);
+    const hasCards = id => Store.cardsInTag(id).some(card => shown.has(card));
+    const ids = Store.tagTree().filter(item => item.depth < 2 && hasCards(item.tag.id)).map(item => item.tag.id);
+    return list.some(untagged) ? [UNTAGGED, ...ids] : ids;
+  }
+  // «Desplegar totes» si n'hi ha alguna de plegada; «Plegar totes» si ja estan totes obertes.
+  function openAllButton(list) {
+    const allOpen = groupIds(list).every(id => state.open.has(id));
+    return html`<div class="cat-tools"><button type="button" class="tag tag-btn cat-all" data-act="groupsAll"
+      aria-pressed="${allOpen}">${t(allOpen ? 'home.closeAll' : 'home.openAll')}</button></div>`;
   }
 
   function setPressed(chip, on) {
