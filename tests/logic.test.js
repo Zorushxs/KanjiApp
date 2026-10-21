@@ -331,11 +331,12 @@ ok(Store.tags.length === 1 && !Object.keys(Store.snapshot().cardTags).length, 'r
 Store.load({
   kanji: [good],
   tags: [{ id: 't1', name: 'A', parent: 't2' }, { id: 't2', name: 'B', parent: 't1' }, { id: 't3', name: ' ', parent: '' },
-    { id: 'x', name: 'C' }, { id: 't4', name: 'D', parent: 't9' }, { id: 't1', name: 'E' }],
+    { id: 'x', name: 'C' }, { id: 't4', name: 'dies', parent: 't9' }, { id: 't1', name: 'E' }],
   cardTags: { '日': ['t1', 't1', 't7'], '月': ['t2'] },
 });
 ok(Store.tags.map(x => x.id).join() === 't1,t2,t4' && Store.tags.every(x => !x.parent || Store.tag(x.parent)), 'norm: ids i noms vàlids, sense pares que no hi són');
 ok(Store.tagTree().length === 3, 'norm: sense cercles (A dins de B dins de A)');
+ok(Store.tag('t4').name === 'Dies', 'norm: les que ja hi eren en minúscula, amb majúscula');
 ok(JSON.stringify(Store.snapshot().cardTags) === '{"日":["t1"]}', 'norm: etiquetes de fitxes que existeixen, sense repetir');
 ok(Store.addTag('F').id === 't5', 'id nou: el següent al més alt');
 
@@ -355,6 +356,9 @@ ok(Store.newTagLabels([['A', 'B'], ['A', 'Nova'], ['Menjar', 'Fruita'], ['menjar
   'newTagLabels: les que caldria crear, sense repetir');
 const fruit = Store.ensureTagPath(['Menjar', 'Fruita']);
 ok(Store.tagLabel(fruit) === 'Menjar › Fruita' && Store.ensureTagPath(['menjar', 'fruita']) === fruit, 'ensureTagPath: crea les que falten i després les troba');
+const lower = Store.ensureTagPath(['animals', 'ocells']), epoca = Store.addTag('època').id;
+ok(Store.tagLabel(lower) === 'Animals › Ocells' && Store.tag(epoca).name === 'Època', 'la primera lletra, sempre en majúscula');
+ok(!Store.renameTag(epoca, 'àpats').error && Store.tag(epoca).name === 'Àpats' && Store.addTag('食べ物').id, 'també en canviar el nom (i el japonès, igual)');
 Store.addCardTags('一', [fruit, 't1', 'tzz']); Store.addCardTags('一', ['t1']);
 ok(Store.cardTags('一').join() === [fruit, 't1'].join(), 'addCardTags: afegeix sense repetir ni treure');
 ok(JSON.stringify(Validar.categoryPaths(['Calendari › Mesos', 'calendari›mesos', 'Números', 'A > B > C', ' ', 3, 'X/Y']))
@@ -377,14 +381,14 @@ Store.load({ kanji: [good], tags: [{ id: 't1', name: 'Temps', parent: '' }, { id
   { id: 't6', name: 'Números 2', parent: '' }] });
 const names = list => list.map(x => x.name).join();
 Store.reorderTags(['t5', 't1', 't6', 't3']);
-ok(names(Store.tagChildren('')) === 'Números 10,Temps,Números 2,Animals' && names(Store.tagChildren('t1')) === 'mesos,Dies', 'reorderTags: les principals');
+ok(names(Store.tagChildren('')) === 'Números 10,Temps,Números 2,Animals' && names(Store.tagChildren('t1')) === 'Mesos,Dies', 'reorderTags: les principals');
 Store.reorderTags(['t1', 't4']);
 ok(names(Store.tagChildren('')) === 'Números 10,Temps,Números 2,Animals', 'reorderTags: si no són germanes, no fa res');
 Store.reorderTags(['t4', 't2']);
-ok(names(Store.tagChildren('t1')) === 'Dies,mesos', 'reorderTags: les subcategories');
+ok(names(Store.tagChildren('t1')) === 'Dies,Mesos', 'reorderTags: les subcategories');
 Prefs.view('alphaCategories', true);
-ok(names(Store.tagChildren('')) === 'Animals,Números 2,Números 10,Temps' && names(Store.tagChildren('t1')) === 'Dies,mesos'
-  && Store.tagTree().map(x => x.tag.name).join() === 'Animals,Números 2,Números 10,Temps,Dies,mesos', 'A-Z: alfabètic, amb els números en ordre');
+ok(names(Store.tagChildren('')) === 'Animals,Números 2,Números 10,Temps' && names(Store.tagChildren('t1')) === 'Dies,Mesos'
+  && Store.tagTree().map(x => x.tag.name).join() === 'Animals,Números 2,Números 10,Temps,Dies,Mesos', 'A-Z: alfabètic, amb els números en ordre');
 Store.shiftTag('t3', -1);
 Prefs.view('alphaCategories', false);
 ok(names(Store.tagChildren('')) === 'Números 10,Temps,Animals,Números 2', 'el teu ordre es manté (i ↑ ↓ el mouen, encara que es vegi en A-Z)');

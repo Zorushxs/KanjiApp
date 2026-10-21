@@ -4,6 +4,7 @@
   --accent: #b3402a; --accent-ink: #ffffff; --accent-soft: #f8e7df;
   --ok: #2e7d4f; --warn: #9a620f; --danger: #b3352f; --ghost: #e6dfd3;
   --ok-soft: #e2f0e7; --danger-soft: #f8e0dd;
+  --sub: #4a6fa5;
   --b1: #c9573f; --b2: #cf8a2e; --b3: #b9a232; --b4: #6f9e4a; --b5: #2e7d4f;
   --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -18,6 +19,7 @@
   --accent: #f08a6c; --accent-ink: #1a1512; --accent-soft: #3b2721;
   --ok: #62c48f; --warn: #e3b252; --danger: #ff8a7a; --ghost: #36312c;
   --ok-soft: #1c3126; --danger-soft: #3b2220;
+  --sub: #8aaedb;
   --b1: #f08a6c; --b2: #eaa54c; --b3: #d9c450; --b4: #98c76e; --b5: #62c48f;
   color-scheme: dark;
 }
@@ -826,7 +828,7 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .home-view-l { flex: none; margin-right: 2px; font-size: 13.5px; font-weight: 600; color: var(--mute); }
 .home-cats-edit { margin-left: auto; color: var(--mute); font-size: 13.5px; }
 /* Grups plegables: la capçalera és un botó a tota l'amplada, amb el nom, quantes fitxes i una marca que gira. */
-.cat-view { display: grid; gap: 8px; }
+.cat-view { display: grid; gap: 14px; }
 /* «Ordre: El meu | A-Z» a l'esquerra i «Desplegar totes / Plegar totes» a la dreta, amb una amplada mínima perquè
    no salti en canviar el text. */
 .cat-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
@@ -838,10 +840,9 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
    com un forat. */
 .cat-sortable { display: grid; gap: 8px; }
 .cat-sortable .cat { cursor: grab; border-style: dashed; user-select: none; -webkit-user-select: none; }
-.cat-sortable .cat-head:hover { background: none; }
 .cat-sortable .cat-head::before { display: none; }
 .cat-sortable .cat.dragging { opacity: .35; border-color: var(--accent); }
-.cat-subs { padding-top: 0; }
+.cat-subs { padding-top: 10px; }
 .cat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
 .cat-head {
   display: flex;
@@ -871,9 +872,38 @@ legend { padding: 0; margin-bottom: 8px; font-size: 13.5px; font-weight: 600; co
 .cat-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cat-n { flex: none; color: var(--mute); font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .cat-body { display: grid; gap: 8px; padding: 0 10px 10px; }
-/* Subcategories: dins del grup, amb el fons de la pàgina perquè es distingeixin. */
-.cat.cat-sub { background: var(--bg); }
 .cat.cat-sub .cat-head { padding: 10px 12px; font-size: 15px; }
+/* Inici: els nivells es distingeixen sobretot per la tipografia i la superfície, i el color només fa de marca
+   petita (regla 60-30-10: el color fort, poc i on importa). Els noms, amb Yu Gothic (la japonesa de Windows; als
+   altres sistemes, la japonesa que hi hagi). Categories: en negreta i més grans, amb una ratlleta terracota.
+   Subcategories: sense negreta, a dins, amb el fons de la pàgina (més enfonsat) i la ratlleta blau índigo.
+   «Sense categoria»: la ratlleta grisa. */
+:is(.cat-view, .cat-sortable) .cat { --cat-mark: var(--accent); }
+:is(.cat-view, .cat-sortable) .cat.cat-sub { --cat-mark: var(--sub); background: var(--bg); }
+.cat-view .cat.cat-none { --cat-mark: var(--mute); }
+:is(.cat-view, .cat-sortable) .cat-name { display: flex; align-items: center; gap: 9px; }
+:is(.cat-view, .cat-sortable) .cat-name::before {
+  content: "";
+  flex: none;
+  align-self: stretch;
+  width: 4px;
+  min-height: 1.1em;
+  border-radius: 2px;
+  background: var(--cat-mark);
+}
+:is(.cat-view, .cat-sortable) .cat { --cat-font: "Yu Gothic", YuGothic, var(--jp); }
+:is(.cat-view, .cat-sortable) .cat:not(.cat-sub) > .cat-head { font: 700 18px/1.25 var(--cat-font); }
+:is(.cat-view, .cat-sortable) .cat.cat-sub > .cat-head { font: 400 15px/1.25 var(--cat-font); }
+/* Només a les principals: una línia contínua des del nom fins al número, del color de la ratlleta
+   però suau (si no, amb tot plegat, cansa la vista). */
+.cat-view .cat:not(.cat-sub) > .cat-head .cat-name::after {
+  content: "";
+  flex: 1 1 16px;
+  min-width: 16px;
+  margin: 0 2px 0 6px;
+  border-bottom: 2px solid color-mix(in srgb, var(--cat-mark) 35%, transparent);
+}
+.cat-view .cat-body { padding-top: 2px; }
 .cat-body > .grid { padding: 2px 0; }
 /* Fitxa: les categories que té, com a pastilles; en canviar-les, cada categoria es desplega amb els seus botons. */
 .card-tag-list { display: flex; flex-wrap: wrap; gap: 6px; }

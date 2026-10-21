@@ -337,7 +337,8 @@ const Inici = (() => {
     const group = (id, name, cards, body, sub) => {
       if (!cards.length) return '';
       const open = isOpen(id);
-      return html`<section class="cat${sub ? ' cat-sub' : ''}">
+      const kind = sub ? ' cat-sub' : id === UNTAGGED ? ' cat-none' : '';
+      return html`<section class="cat${kind}">
           <button type="button" class="cat-head" data-act="group" data-group="${id}" aria-expanded="${open}">
             <span class="cat-name">${name}</span><span class="cat-n">${cards.length}</span></button>
           ${open ? html`<div class="cat-body">${body()}</div>` : ''}

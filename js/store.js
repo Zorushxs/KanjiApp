@@ -96,12 +96,14 @@ const Store = (() => {
     });
     return cardTags;
   }
-  // Nom net: una línia, sense caràcters de control i com a molt TAG_MAX caràcters.
-  const tagName = name => (typeof name === 'string' ? name : '')
+  // Nom net: una línia, sense caràcters de control, com a molt TAG_MAX caràcters i amb la primera lletra en
+  // majúscula («mesos» → «Mesos»), l'escrigui qui l'escrigui. Com que també passa en carregar, arregla les que ja hi ha.
+  const tagName = name => capital((typeof name === 'string' ? name : '')
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, TAG_MAX);
+    .slice(0, TAG_MAX));
+  const capital = text => text.charAt(0).toLocaleUpperCase() + text.slice(1);
 
   // ---------- Desar ----------
   function persist() {

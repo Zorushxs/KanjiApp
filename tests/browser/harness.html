@@ -657,6 +657,12 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     $('.cat-all').click(); await sleep(30);
     ok($$('.cat-head').every(h => h.getAttribute('aria-expanded') === 'true') && heads() === 'Sense categoria,Temps,Mesos'
       && $('.cat-all').textContent === 'Plegar totes' && D().activeElement === $('.cat-all'), 'desplegar totes, també les subcategories');
+    const tint = name => W().getComputedStyle(head(name).querySelector('.cat-name'), '::before').backgroundColor;
+    ok(new Set([tint('Sense categoria'), tint('Temps'), tint('Mesos')]).size === 3 && head('Sense categoria').closest('.cat-none'),
+      'cada nivell té la seva marca de color (categoria, subcategoria i sense categoria)');
+    const line = name => W().getComputedStyle(head(name).querySelector('.cat-name'), '::after');
+    ok(line('Temps').borderBottomStyle === 'solid' && line('Mesos').content === 'none',
+      'línia contínua, només a les categories principals');
     $('.cat-all').click(); await sleep(30);
     ok($$('.cat-head').every(h => h.getAttribute('aria-expanded') === 'false') && heads() === 'Sense categoria,Temps'
       && $('.cat-all').textContent === 'Desplegar totes', 'plegar totes');
