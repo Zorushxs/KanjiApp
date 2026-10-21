@@ -808,6 +808,32 @@ const key = k => D().body.dispatchEvent(new KeyboardEvent('keydown', { key: k, b
     $('.verify-all-btn').click(); await sleep(50);
     $('dialog.ask [value="yes"]').click(); await sleep(80);
     ok(pendingN() === 0 && S.get('月').verified === 'error' && $$('.tile .tile-ver.ver-ok').length === total - 1, 'totes verificades, la que té errors es queda');
+
+    // Sense connexió (PWA): el service worker guarda l'app i l'ordre de traços dels kanji, i l'app s'obre igualment
+    ok($('link[rel="manifest"]') && $('meta[name="theme-color"]').content === W().getComputedStyle(D().documentElement).getPropertyValue('--bg').trim(),
+      'manifest i color de la barra del mòbil (el del fons)');
+    const manifest = await (await fetch('../../manifest.webmanifest')).json();
+    ok(manifest.display === 'standalone' && manifest.start_url === './' && manifest.icons.some(i => i.sizes === '512x512' && i.purpose === 'maskable'),
+      'manifest: s’instal·la com a app, amb icones');
+    await W().navigator.serviceWorker.ready;
+    ok(await until(() => W().navigator.serviceWorker.controller), 'service worker actiu');
+    const shell = await W().caches.open('kanji-app');
+    const shellUrls = async () => (await shell.keys()).map(r => r.url.replace(location.origin, ''));
+    const hasShell = async () => { const u = await shellUrls(); return u.includes('/') && u.some(x => /\/js\/app\.js\?v=\d+$/.test(x)) && u.some(x => /styles\.css\?v=/.test(x)); };
+    for (let i = 0; i < 80 && !(await hasShell()); i++) await sleep(100);
+    ok(await hasShell(), 'guarda l’app: ' + (await shellUrls()).length + ' fitxers');
+    ok((await shellUrls()).filter(x => x.startsWith('/js/app.js')).length === 1, 'de cada fitxer, només una versió');
+    const traces = await W().caches.open('kanji-traces');
+    for (let i = 0; i < 100 && (await traces.keys()).length < 2; i++) await sleep(100);
+    ok((await traces.keys()).length >= 2, 'guarda l’ordre de traços dels kanji que tens: ' + (await traces.keys()).length);
+    await fetch('/offline?on=1');
+    try {
+      f.src = '../../index.html?sense-connexio#/k/日'; await new Promise(r => { f.onload = r; });
+      await until(() => G('App') && $('.so svg'), 10000);
+      ok($('.sheet') && $('.so svg path'), 'sense connexió: l’app s’obre, amb la fitxa i l’ordre de traços');
+    } finally {
+      await fetch('/offline?on=0');
+    }
   } catch (e) { fails++; log('EXCEPCIÓ ' + e.stack); }
   log(fails ? `\n${fails} FAILS` : '\nTOT OK');
   document.title = 'done';

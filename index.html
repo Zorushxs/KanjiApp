@@ -9,7 +9,11 @@
 <meta name="description" content="Aprèn kanji amb fitxes, ordre de traços i repetició espaiada.">
 <title>Kanji</title>
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-<link rel="stylesheet" href="css/styles.css?v=42">
+<!-- Per instal·lar-la com a app (PWA): el manifest, la icona per a iPhone i el color de la barra del mòbil. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-any-192.png">
+<meta name="theme-color" content="#f6f3ee">
+<link rel="stylesheet" href="css/styles.css?v=43">
 <script>
   // Tema abans de pintar, perquè no parpellegi (la mateixa clau que Prefs.theme, a js/prefs.js).
   try { const th = localStorage.getItem('kanji:tema'); if (th) document.documentElement.dataset.theme = th; } catch {}
@@ -64,23 +68,23 @@
 <input id="importInput" type="file" accept=".json,application/json" hidden>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="js/prefs.js?v=42"></script>
-<script src="js/i18n.js?v=42"></script>
-<script src="js/util.js?v=42"></script>
-<script src="js/card.js?v=42"></script>
-<script src="js/peces.js?v=42"></script>
-<script src="js/almacen.js?v=42"></script>
-<script src="js/validar.js?v=42"></script>
-<script src="js/store.js?v=42"></script>
-<script src="js/prompt.js?v=42"></script>
-<script src="js/veu.js?v=42"></script>
-<script src="js/traces.js?v=42"></script>
-<script src="js/inici.js?v=42"></script>
-<script src="js/fitxa.js?v=42"></script>
-<script src="js/afegir.js?v=42"></script>
-<script src="js/practica.js?v=42"></script>
-<script src="js/calendari.js?v=42"></script>
-<script src="js/etiquetes.js?v=42"></script>
-<script src="js/app.js?v=42"></script>
+<script src="js/prefs.js?v=43"></script>
+<script src="js/i18n.js?v=43"></script>
+<script src="js/util.js?v=43"></script>
+<script src="js/card.js?v=43"></script>
+<script src="js/peces.js?v=43"></script>
+<script src="js/almacen.js?v=43"></script>
+<script src="js/validar.js?v=43"></script>
+<script src="js/store.js?v=43"></script>
+<script src="js/prompt.js?v=43"></script>
+<script src="js/veu.js?v=43"></script>
+<script src="js/traces.js?v=43"></script>
+<script src="js/inici.js?v=43"></script>
+<script src="js/fitxa.js?v=43"></script>
+<script src="js/afegir.js?v=43"></script>
+<script src="js/practica.js?v=43"></script>
+<script src="js/calendari.js?v=43"></script>
+<script src="js/etiquetes.js?v=43"></script>
+<script src="js/app.js?v=43"></script>
 </body>
 </html>

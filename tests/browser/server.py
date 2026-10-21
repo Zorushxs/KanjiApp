@@ -5,8 +5,22 @@ import http.server, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(os.path.join(HERE, '..', '..'))
 
+OFFLINE = False
+
 class H(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
+        # /offline?on=1 fa veure que no hi ha connexió: fins a /offline?on=0, tancarà sense respondre res (per
+        # provar que l'app s'obre amb el service worker).
+        global OFFLINE
+        if self.path.startswith('/offline'):
+            OFFLINE = self.path.endswith('on=1')
+            self.send_response(204)
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            return
+        if OFFLINE:
+            self.close_connection = True
+            return
         # /slow?ms=3000 respon tard: endarrereix el "load" de la pàgina per fer la captura amb tot carregat.
         if self.path.startswith('/slow'):
             import time, urllib.parse

@@ -3,6 +3,7 @@
 const Traces = (() => {
   const { html } = U;
   const BASE ='https://cdn.jsdelivr.net/gh/KanjiVG/kanjivg@r20260714/kanji/';
+  const CACHE = 'kanji-traces'; // el mateix nom que a sw.js
   const NS = 'http://www.w3.org/2000/svg';
   const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9.,eE\s-]+$/;
   const cache = new Map();
@@ -86,5 +87,21 @@ const Traces = (() => {
         <button type="button" class="btn small" data-act="so-retry">${t('card.soRetry')}</button>`;
     });
   }
-  return { mount, play };
+  // Guarda per endavant l'ordre de traços d'aquests kanji, d'un en un, al mateix lloc on el desa el service worker
+  // (sw.js), perquè es vegi sense connexió. Els que ja hi són no es tornen a baixar.
+  async function keep(chars) {
+    if (!('caches' in window) || !navigator.onLine) return 0;
+    const saved = await caches.open(CACHE);
+    let added = 0;
+    for (const ch of new Set(chars)) {
+      const url = BASE + file(ch);
+      if (await saved.match(url)) continue;
+      const response = await fetch(url).catch(() => null);
+      if (!response || !response.ok) continue;
+      await saved.put(url, response);
+      added++;
+    }
+    return added;
+  }
+  return { mount, play, keep };
 })();

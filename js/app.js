@@ -85,10 +85,16 @@ const App = (() => {
   function setTheme(theme) {
     document.documentElement.dataset.theme = theme;
     Prefs.set('theme', theme);
+    paintSystemBar();
+  }
+  // La barra del mòbil (la de l'hora i la bateria, a l'app instal·lada) del color del fons, en clar i en fosc.
+  function paintSystemBar() {
+    $('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   }
   if (!document.documentElement.dataset.theme) {
     setTheme(matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   }
+  paintSystemBar();
   $('#themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   Peces.setRomaji(Prefs.view('romaji'));
 
@@ -221,7 +227,19 @@ const App = (() => {
     renderLangs();
     renderState('saved');
     route();
+    offline();
   })();
+
+  // ---------- Sense connexió (PWA) ----------
+  // El service worker (sw.js) guarda l'app perquè s'obri sense connexió; aquí, a més, es guarda l'ordre de traços
+  // dels kanji que tens, perquè també es vegi a l'avió.
+  function offline() {
+    if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+    const kanji = Store.kanji.filter(card => !Card.isWord(card.kanji)).map(card => card.kanji);
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(() => Traces.keep(kanji))
+      .catch(error => console.warn('[PWA] Sense connexió no funcionarà:', error));
+  }
 
   return { back, replace };
 })();
